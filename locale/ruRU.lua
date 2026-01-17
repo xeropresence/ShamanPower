@@ -1,4 +1,4 @@
-﻿local L = LibStub("AceLocale-3.0"):NewLocale("PallyPower", "ruRU", false, false)
+﻿local L = LibStub("AceLocale-3.0"):NewLocale("ShamanPower", "ruRU", false, false)
 if not L then return end 
 L["--- End of assignments ---"] = "--- Конец назначений ---"
 L["--- Paladin assignments ---"] = "---  Благословения Паладинов ---"
@@ -9,16 +9,16 @@ L["[|cffffd200Enable|r/|cffffd200Disable|r] The Drag Handle Button."] = "[|cffff
 L["[|cffffd200Enable|r/|cffffd200Disable|r] The Player(s) or Class Buttons."] = "[|cffffd200Вкл|r/|cffffd200Выкл|r] кнопки Игроков или Классов."
 L["[|cffffd200Enable|r/|cffffd200Disable|r] The Seal Button, Enable/Disable Righteous Fury or select the Seal you want to track."] = "[|cffffd200Вкл|r/|cffffd200Выкл|r] кнопку Печати, [|cffffd200Вкл|r/|cffffd200Выкл|r] Праведное неистовство или выбрать Печать для отслеживания."
 L["[Enable/Disable] Class Buttons"] = "[Показать/Скрыть] Кнопки классов"
-L["[Enable/Disable] PallyPower"] = "[Показать/Скрыть] PallyPower"
-L["[Enable/Disable] PallyPower in Party"] = "[Показывать/Скрыть] PallyPower в группе"
-L["[Enable/Disable] PallyPower while Solo"] = "[Показать/Скрыть] PallyPower при игре в одиночку"
+L["[Enable/Disable] ShamanPower"] = "[Показать/Скрыть] ShamanPower"
+L["[Enable/Disable] ShamanPower in Party"] = "[Показывать/Скрыть] ShamanPower в группе"
+L["[Enable/Disable] ShamanPower while Solo"] = "[Показать/Скрыть] ShamanPower при игре в одиночку"
 L["[Enable/Disable] Righteous Fury"] = "[Вкл/Выкл] кнопку Праведного неистовства"
 L["[Enable/Disable] The Aura Button"] = "[Вкл/Выкл] кнопку Ауры"
 L["[Enable/Disable] The Auto Buff Button"] = "[Вкл/Выкл] кнопку Автобаффа"
 L["[Enable/Disable] The Drag Handle"] = "[Вкл/Выкл] кнопку Перетаскивания"
 L["[Enable/Disable] The Seal Button"] = "[Включить / Отключить] Кнопка тюлень"
 L["[Show/Hide] Minimap Icon"] = "[Показат/Скрыть] иконку у миникарты"
-L["[Show/Hide] The PallyPower Tooltips"] = "[Показать/Скрыть] подсказки PallyPower"
+L["[Show/Hide] The ShamanPower Tooltips"] = "[Показать/Скрыть] подсказки ShamanPower"
 L["a Normal Blessing from:"] = "Обычное благословение от:"
 L["Aura Button"] = "Кнопка Ауры"
 L["Aura Tracker"] = "Отслеживание Ауры"
@@ -52,17 +52,17 @@ L["Change the Button Background Textures"] = "Изменить текстуру 
 L["Change the Button Borders"] = "Смена рамок Кнопок"
 L["Change the button settings"] = "Изменение настроек кнопок"
 L["Change the status colors of the buff buttons"] = "Изменить цвет статуса кнопок баффов"
-L["Change the way PallyPower looks"] = "Изменить внешний вид PallyPower"
+L["Change the way ShamanPower looks"] = "Изменить внешний вид ShamanPower"
 L["Class & Player Buttons"] = "Кнопки Класса и Игрока"
 L["Class Buttons"] = "Кнопки Классов"
 L["Clear"] = "Сброс"
 L["Drag Handle"] = "Кнопка Перетаскивания"
 L["Drag Handle Button"] = "Кнопка Перетаскивания"
-L["DRAGHANDLE_TOOLTIP"] = [=[|cffffffff[ЛКМ]|r |cffff0000Заблокировать|r/|cff00ff00Разблокировать|r PallyPower
-|cffffffff[Удерживать ЛКМ]|r Передвинуть PallyPower
+L["DRAGHANDLE_TOOLTIP"] = [=[|cffffffff[ЛКМ]|r |cffff0000Заблокировать|r/|cff00ff00Разблокировать|r ShamanPower
+|cffffffff[Удерживать ЛКМ]|r Передвинуть ShamanPower
 |cffffffff[ПКМ]|r Открыть окно назначения Благословений
 |cffffffff[Shift-ПКМ]|r Открыть окно Настроек]=]
-L["Enable PallyPower"] = "Всегда/Никогда"
+L["Enable ShamanPower"] = "Всегда/Никогда"
 L["Free Assignment"] = "Вольный режим"
 L["FREE_ASSIGN_TOOLTIP"] = [=[Разрешает другим паладинам изменять
 благословения, не являясь лидером
@@ -78,16 +78,16 @@ L["If this option is disabled then Class and Player buttons will ignore buffs' d
 L["If this option is disabled then you will no longer see the pop out buttons showing individual players and you will not be able to reapply Normal Blessings while in combat."] = "Если эта опция отключена, то вы больше не увидите всплывающие кнопки при наведении на кнопку Класса, показывающие отдельных игроков. Вы не сможете повторно применить Обычные благословения в бою."
 L["If this option is enabled then the Auto Buff Button and the Class Buff Button(s) will not auto buff a Greater Blessing if recipient(s) are not within the Paladins range (100yds). This range check excludes AFK, Dead and Offline players."] = "Если эта опция включена, то кнопка Автобаффа не будет автоматически пытаться бафать класс Великим Благословением или игрока Обычным Благословением, если они мертвы, не в сети или не находятся в пределах досягаемости."
 --[[Translation missing --]]
-L["If you enable this option PallyPower will automatically over-write a Greater Blessing with a Normal Blessing on players marked with the |cffffd200Main Assistant|r role in the Blizzard Raid Panel. This is useful for spot buffing the |cffffd200Main Assistant|r role with Blessing of Sanctuary."] = "If you enable this option PallyPower will automatically over-write a Greater Blessing with a Normal Blessing on players marked with the |cffffd200Main Assistant|r role in the Blizzard Raid Panel. This is useful for spot buffing the |cffffd200Main Assistant|r role with Blessing of Sanctuary."
-L["If you enable this option PallyPower will automatically over-write a Greater Blessing with a Normal Blessing on players marked with the |cffffd200Main Assistant|r role in the Blizzard Raid Panel. This is useful to avoid blessing the |cffffd200Main Assistant|r role with a Greater Blessing of Salvation."] = "Если вы включите эту опцию, PallyPower автоматически перезапишет Великое благословение на Обычное благословением для игроков, помеченных ролью |cffffd200Наводчик|r в интерфейсе рейда. Это полезно, чтобы самостоятельно заменять Великое благословение спасения другим благословением для роли |cffffd200Наводчика|r кликая по кнопке игрока ПКМ."
+L["If you enable this option ShamanPower will automatically over-write a Greater Blessing with a Normal Blessing on players marked with the |cffffd200Main Assistant|r role in the Blizzard Raid Panel. This is useful for spot buffing the |cffffd200Main Assistant|r role with Blessing of Sanctuary."] = "If you enable this option ShamanPower will automatically over-write a Greater Blessing with a Normal Blessing on players marked with the |cffffd200Main Assistant|r role in the Blizzard Raid Panel. This is useful for spot buffing the |cffffd200Main Assistant|r role with Blessing of Sanctuary."
+L["If you enable this option ShamanPower will automatically over-write a Greater Blessing with a Normal Blessing on players marked with the |cffffd200Main Assistant|r role in the Blizzard Raid Panel. This is useful to avoid blessing the |cffffd200Main Assistant|r role with a Greater Blessing of Salvation."] = "Если вы включите эту опцию, ShamanPower автоматически перезапишет Великое благословение на Обычное благословением для игроков, помеченных ролью |cffffd200Наводчик|r в интерфейсе рейда. Это полезно, чтобы самостоятельно заменять Великое благословение спасения другим благословением для роли |cffffd200Наводчика|r кликая по кнопке игрока ПКМ."
 --[[Translation missing --]]
-L["If you enable this option PallyPower will automatically over-write a Greater Blessing with a Normal Blessing on players marked with the |cffffd200Main Tank|r role in the Blizzard Raid Panel. This is useful for spot buffing the |cffffd200Main Tank|r role with Blessing of Sanctuary."] = "If you enable this option PallyPower will automatically over-write a Greater Blessing with a Normal Blessing on players marked with the |cffffd200Main Tank|r role in the Blizzard Raid Panel. This is useful for spot buffing the |cffffd200Main Tank|r role with Blessing of Sanctuary."
-L["If you enable this option PallyPower will automatically over-write a Greater Blessing with a Normal Blessing on players marked with the |cffffd200Main Tank|r role in the Blizzard Raid Panel. This is useful to avoid blessing the |cffffd200Main Tank|r role with a Greater Blessing of Salvation."] = "Если вы включите эту опцию, PallyPower автоматически перезапишет Великое благословение Обычным Благословением для игроков, помеченных ролью |cffffd200Главный танк|r в интерфейсе рейда. Это полезно, чтобы самостоятельно заменять Великое благословение спасения другим благословением для роли |cffffd200Главного танка|r кликая по кнопке игрока ПКМ."
+L["If you enable this option ShamanPower will automatically over-write a Greater Blessing with a Normal Blessing on players marked with the |cffffd200Main Tank|r role in the Blizzard Raid Panel. This is useful for spot buffing the |cffffd200Main Tank|r role with Blessing of Sanctuary."] = "If you enable this option ShamanPower will automatically over-write a Greater Blessing with a Normal Blessing on players marked with the |cffffd200Main Tank|r role in the Blizzard Raid Panel. This is useful for spot buffing the |cffffd200Main Tank|r role with Blessing of Sanctuary."
+L["If you enable this option ShamanPower will automatically over-write a Greater Blessing with a Normal Blessing on players marked with the |cffffd200Main Tank|r role in the Blizzard Raid Panel. This is useful to avoid blessing the |cffffd200Main Tank|r role with a Greater Blessing of Salvation."] = "Если вы включите эту опцию, ShamanPower автоматически перезапишет Великое благословение Обычным Благословением для игроков, помеченных ролью |cffffd200Главный танк|r в интерфейсе рейда. Это полезно, чтобы самостоятельно заменять Великое благословение спасения другим благословением для роли |cffffd200Главного танка|r кликая по кнопке игрока ПКМ."
 L["If you enable this option, you will not be allowed to assign Blessing of Wisdom to Warriors or Rogues, and Blessing of Might to Mages, Warlocks, or Hunters."] = "Если эта опция включена, то запрещает назначать Благословение мудрости для Воинов или Разбойников и Благословение могущества для Магов, Чернокнижников и Охотников."
 L["If you enable this option, you will not be allowed to assign Blessing of Wisdom to Warriors, Rogues, or Death Knights and Blessing of Might to Mages, Warlocks, or Hunters."] = [=[Если вы включите эту опцию, вы не сможете назначать Благословение мудрости для
 Воинов, Разбойников или Рыцарей смерти или Благословение могущества для Магов, Чернокнижников и Охотников.]=]
 L["LAYOUT_TOOLTIP"] = "Вертикально [Слева/Справа] Горизонтально [Вверху/Внизу]"
-L["Main PallyPower Settings"] = "Когда показывать PallyPower"
+L["Main ShamanPower Settings"] = "Когда показывать ShamanPower"
 L["Main Tank / Main Assist Roles"] = "Роли Главный танк / Наводчик"
 L["MAIN_ROLES_DESCRIPTION"] = [=[Эти параметры можно использовать для автоматического назначения (автозамены)  любого Великого Благословения на Обычное Благословение, назначенного |cffff0000Воинам, Друидам или Паладинам|r.
 
@@ -105,12 +105,12 @@ L["MINIMAP_ICON_TOOLTIP"] = [=[|cffffffff[ЛКМ]|r Открыть назнач�
 L["None"] = "Нет"
 L["None Buffed"] = "Нет баффов"
 L["Options"] = "Настройки"
-L["OPTIONS_BUTTON_TOOLTIP"] = "Открыть окно настроек PallyPower."
+L["OPTIONS_BUTTON_TOOLTIP"] = "Открыть окно настроек ShamanPower."
 L["Override Druids / Paladins..."] = "Автозамена для Друидов/Паладинов..."
 L["Override Warriors / Death Knights..."] = "Переопределить Воинов / Рыцарей Смерти..."
 L["Override Warriors..."] = "Автозамена для Воинов..."
-L["PallyPower Buttons Scale"] = "Масштаб кнопок баффа"
-L["PallyPower Classic"] = "PallyPower"
+L["ShamanPower Buttons Scale"] = "Масштаб кнопок баффа"
+L["ShamanPower Classic"] = "ShamanPower"
 L["Partially Buffed"] = "Неполные баффы"
 L["Player Buttons"] = "Кнопки Игроков"
 L["PP_CLEAR_TOOLTIP"] = [=[Очищает все назначенные
@@ -131,7 +131,7 @@ L["REPORT_CHANNEL_OPTION_TOOLTIP"] = [=[Установите канал для �
 |cffffd200[Список каналов]|r Автоматически заполненный список каналов, основанный на каналах, к которым игрок присоединился.|nКаналы по умолчанию, такие как Торговля, Общий и т. д. автоматически отфильтровываются из списка.
 
 |cffffff00Примечание: если вы измените свой порядок каналов, вам потребуется перезагрузить интерфейс и убедиться, что он вещает на правильный канал.|r]=]
-L["Reset all PallyPower frames back to center"] = "Вернуть все рамки PallyPower в центр"
+L["Reset all ShamanPower frames back to center"] = "Вернуть все рамки ShamanPower в центр"
 L["Reset Frames"] = "Сброс рамок"
 L["RESIZEGRIP_TOOLTIP"] = [=[ЛКМ и удерживание, для изменения размера.
 ПКМ сбрасывает размер до изначального]=]
@@ -165,7 +165,7 @@ L["SHOWPETS_OPTION_TOOLTIP_VANILLA"] = [=[Если эта опция включ�
 |cffffff00Примечание: из-за того, как работают Великие Благословения, питомцев необходимо баффать отдельно. Также Бес Чернокнижника будет скрыт, если включено Бегство в астрал.]=]
 L["Smart Buffs"] = "Умные баффы"
 L["This allows you to adjust the overall size of the Blessing Assignments Panel"] = "Это позволяет настроить общий размер окна назначений благословения"
-L["This allows you to adjust the overall size of the PallyPower Buttons"] = "Установить масштаб панели кнопок баффа"
+L["This allows you to adjust the overall size of the ShamanPower Buttons"] = "Установить масштаб панели кнопок баффа"
 L["Use in Party"] = "В группе"
 L["Use when Solo"] = "При игре в одиночку"
 L["Vertical Down | Left"] = "По вертикали вниз | слева"
@@ -174,6 +174,6 @@ L["Vertical Up | Left"] = "По вертикали вверх | слева"
 L["Vertical Up | Right"] = "По вертикали вверх | справа"
 L["Visibility Settings"] = "Настройки видимости"
 L["Wait for Players"] = "Ожидать игроков"
-L["What to buff with PallyPower"] = "Что баффать при помощи PallyPower"
+L["What to buff with ShamanPower"] = "Что баффать при помощи ShamanPower"
 L["While you are in a Raid dungeon, hide any players outside of the usual subgroups for that dungeon. For example, if you are in a 10-player dungeon, any players in Group 3 or higher will be hidden."] = "Пока вы находитесь в рейдовом подземелье, скроет всех игроков, не входящих в обычные подгруппы для этого подземелья. Например, если вы находитесь в подземелье на 10 игроков, все игроки из группы 3 и выше будут скрыты."
 

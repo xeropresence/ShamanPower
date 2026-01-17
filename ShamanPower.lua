@@ -299,8 +299,8 @@ function ShamanPower:OnProfileChanged()
 end
 
 function ShamanPower:BindKeys()
-	local key1 = GetBindingKey("AUTOKEY1")
-	local key2 = GetBindingKey("AUTOKEY2")
+	local key1 = GetBindingKey("SHAMANPOWER_AUTOKEY1")
+	local key2 = GetBindingKey("SHAMANPOWER_AUTOKEY2")
 	if key1 then
 		SetOverrideBindingClick(self.autoButton, false, key1, "ShamanPowerAuto", "Hotkey1")
 	end
@@ -643,7 +643,7 @@ function ShamanPowerBlessingsGrid_Update(self, elapsed)
 	if not ShamanPower_NormalAssignments then ShamanPower_NormalAssignments = {} end
 	if not ShamanPower_AuraAssignments then ShamanPower_AuraAssignments = {} end
 	if ShamanPowerBlessingsFrame:IsVisible() then
-		local numPallys = 0
+		local numShamans = 0
 		local numMaxClass = 0
 		-- Hide all ClassGroups and AuraGroups - Shamans don't need these
 		-- Totems affect the whole party, not individual players
@@ -777,15 +777,15 @@ function ShamanPowerBlessingsGrid_Update(self, elapsed)
 				end
 			end
 			i = i + 1
-			numPallys = numPallys + 1
+			numShamans = numShamans + 1
 		end
 		-- Simplified height for Shaman addon (no class rows needed)
 		-- Compact layout: title(24) + headers(20) + rows(55 each) + checkbox(25) + buttons(35)
-		ShamanPowerBlessingsFrame:SetHeight(50 + (numPallys * 55) + 55)
+		ShamanPowerBlessingsFrame:SetHeight(50 + (numShamans * 55) + 55)
 		_G["ShamanPowerBlessingsFramePlayer1"]:SetPoint("TOPLEFT", 8, -48)
 		for i = 1, SHAMANPOWER_MAXPERCLASS do
 			local fname = "ShamanPowerBlessingsFramePlayer" .. i
-			if i <= numPallys then
+			if i <= numShamans then
 				_G[fname]:Show()
 			else
 				_G[fname]:Hide()

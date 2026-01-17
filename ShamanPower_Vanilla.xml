@@ -1,7 +1,7 @@
 <Ui xmlns = "http://www.blizzard.com/wow/ui/" xmlns:xsi = "http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation = "http://www.blizzard.com/wow/ui/ C:\Projects\WoW\Bin\Interface\FrameXML\UI.xsd">
 
-<!-- PallyPower Buttons -->
-	<Button name = "PallyPowerRFButtonTemplate" virtual = "true" frameStrata = "LOW" inherits = "SecureActionButtonTemplate">
+<!-- ShamanPower Buttons -->
+	<Button name = "ShamanPowerRFButtonTemplate" virtual = "true" frameStrata = "LOW" inherits = "SecureActionButtonTemplate">
 		<Size>
 			<AbsDimension x = "100" y = "34"/>
 		</Size>
@@ -63,15 +63,15 @@
 		<Scripts>
 			<OnMouseWheel>
 				if (delta==-1) then
-					PallyPower:SealCycle();
+					ShamanPower:SealCycle();
 				else
-					PallyPower:SealCycleBackward();
+					ShamanPower:SealCycleBackward();
 				end
 			</OnMouseWheel>
 		</Scripts>
 	</Button>
 
-	<Button name = "PallyPowerAuraButtonTemplate" virtual = "true" frameStrata = "LOW" inherits = "SecureActionButtonTemplate">
+	<Button name = "ShamanPowerAuraButtonTemplate" virtual = "true" frameStrata = "LOW" inherits = "SecureActionButtonTemplate">
 		<Size>
 			<AbsDimension x = "100" y = "34"/>
 		</Size>
@@ -122,16 +122,16 @@
 			<OnMouseWheel>
 				if InCombatLockdown() then return false end
 				if (delta==-1) then  --mouse wheel down
-					PallyPower:PerformAuraCycle(PallyPower.player, true);
+					ShamanPower:PerformAuraCycle(ShamanPower.player, true);
 				else
-					PallyPower:PerformAuraCycleBackwards(PallyPower.player, true);
+					ShamanPower:PerformAuraCycleBackwards(ShamanPower.player, true);
 				end
-				PallyPower:ButtonsUpdate();
+				ShamanPower:ButtonsUpdate();
 			</OnMouseWheel>
 		</Scripts>
 	</Button>
 
-	<Button name = "PallyPowerAutoButtonTemplate" virtual = "true" frameStrata = "LOW">
+	<Button name = "ShamanPowerAutoButtonTemplate" virtual = "true" frameStrata = "LOW">
 		<Size>
 			<AbsDimension x = "100" y = "34"/>
 		</Size>
@@ -140,7 +140,7 @@
 		</KeyValues>
 		<Layers>
 			<Layer level = "OVERLAY">
-				<Texture name = "$parentIcon" file = "Interface\AddOns\PallyPower\Icons\SummonChampion">
+				<Texture name = "$parentIcon" file = "Interface\AddOns\ShamanPower\Icons\SummonChampion">
 					<Size>
 						<AbsDimension x = "26" y = "26"/>
 					</Size>
@@ -192,15 +192,15 @@
 		</Layers>
 		<Scripts>
 			<PreClick>
-				PallyPower:AutoBuff(self, button);
+				ShamanPower:AutoBuff(self, button);
 			</PreClick>
 			<PostClick>
-				PallyPower:AutoBuffClear(self, button);
+				ShamanPower:AutoBuffClear(self, button);
 			</PostClick>
 		</Scripts>
 	</Button>
 
-	<Button name = "PallyPowerButtonTemplate" virtual = "true" frameStrata = "LOW">
+	<Button name = "ShamanPowerButtonTemplate" virtual = "true" frameStrata = "LOW">
 		<Size>
 			<AbsDimension x = "100" y = "34"/>
 		</Size>
@@ -273,25 +273,25 @@
 		</Layers>
 		<Scripts>
 			<PreClick>
-				PallyPower:ButtonPreClick(self, button, down);
+				ShamanPower:ButtonPreClick(self, button, down);
 			</PreClick>
 			<PostClick>
-				PallyPower:ButtonPostClick(self, button, down);
-				PallyPower:UpdateButtonOnPostClick(self, button, down);
+				ShamanPower:ButtonPostClick(self, button, down);
+				ShamanPower:UpdateButtonOnPostClick(self, button, down);
 			</PostClick>
 			<OnMouseWheel>
 				if InCombatLockdown() then return false end
 				if (delta==-1) then --mouse wheel down
-					PallyPower:PerformCycle(PallyPower.player, self:GetAttribute("classID"), true);
+					ShamanPower:PerformCycle(ShamanPower.player, self:GetAttribute("classID"), true);
 				else
-					PallyPower:PerformCycleBackwards(PallyPower.player, self:GetAttribute("classID"), true);
+					ShamanPower:PerformCycleBackwards(ShamanPower.player, self:GetAttribute("classID"), true);
 				end
-				PallyPower:ButtonsUpdate();
+				ShamanPower:ButtonsUpdate();
 			</OnMouseWheel>
 		</Scripts>
 	</Button>
 
-	<Button name = "PallyPowerPopupTemplate" virtual = "true" frameStrata = "DIALOG">
+	<Button name = "ShamanPowerPopupTemplate" virtual = "true" frameStrata = "DIALOG">
 		<Size>
 			<AbsDimension x = "100" y = "34"/>
 		</Size>
@@ -376,22 +376,22 @@
 		</Layers>
 		<Scripts>
 			<PreClick>
-				PallyPower:PButtonPreClick(self, button, down);
+				ShamanPower:PButtonPreClick(self, button, down);
 			</PreClick>
 			<PostClick>
-				PallyPower:UpdatePButtonOnPostClick(self, button, down);
+				ShamanPower:UpdatePButtonOnPostClick(self, button, down);
 			</PostClick>
 			<OnMouseWheel>
 				if InCombatLockdown() then return false end
-				local pname = (PallyPower:GetUnit(self:GetAttribute("classID"), self:GetAttribute("playerID"))).name
-				PallyPower:PerformPlayerCycle(delta, pname, self:GetAttribute("classID"));
-				PallyPower:ButtonsUpdate();
+				local pname = (ShamanPower:GetUnit(self:GetAttribute("classID"), self:GetAttribute("playerID"))).name
+				ShamanPower:PerformPlayerCycle(delta, pname, self:GetAttribute("classID"));
+				ShamanPower:ButtonsUpdate();
 			</OnMouseWheel>
 		</Scripts>
 	</Button>
 
-	<!-- PallyPower Buff Frames -->
-	<Frame name="PallyPowerFrame" movable="true" frameStrata="LOW" enableMouse="true" parent="UIParent" hidden="false">
+	<!-- ShamanPower Buff Frames -->
+	<Frame name="ShamanPowerFrame" movable="true" frameStrata="LOW" enableMouse="true" parent="UIParent" hidden="false">
 		<Size>
 			<AbsDimension x = "1" y = "1"/>
 		</Size>
@@ -401,25 +401,25 @@
 			</Anchor>
 		</Anchors>
 		<Frames>
-			<CheckButton name = "PallyPowerAnchor" enableMouse = "true" frameStrata = "LOW" inherits = "SecureHandlerStateTemplate">
+			<CheckButton name = "ShamanPowerAnchor" enableMouse = "true" frameStrata = "LOW" inherits = "SecureHandlerStateTemplate">
 				<Scripts>
 					<OnLoad>
 						self:RegisterForDrag("LeftButton");
 						self:RegisterForClicks("LeftButtonUp", "RightButtonUp");
 					</OnLoad>
 					<OnClick>
-						PallyPower:ClickHandle(self, button, down);
+						ShamanPower:ClickHandle(self, button, down);
 					</OnClick>
 					<OnDragStart>
-						PallyPower:DragStart(self, button);
+						ShamanPower:DragStart(self, button);
 					</OnDragStart>
 					<OnDragStop>
-						PallyPower:DragStop(self, button);
+						ShamanPower:DragStop(self, button);
 					</OnDragStop>
 					<OnEnter>
-						if PallyPower.opt.ShowTooltips then
+						if ShamanPower.opt.ShowTooltips then
 							GameTooltip:SetOwner(self, "ANCHOR_RIGHT");
-							GameTooltip:SetText(PallyPower.CONFIG_DRAGHANDLE);
+							GameTooltip:SetText(ShamanPower.CONFIG_DRAGHANDLE);
 							GameTooltip:Show(self, motion);
 							CursorUpdate(self, motion);
 						end
@@ -434,10 +434,10 @@
 				<Anchors>
 					<Anchor point = "CENTER" relativeTo = "$parent" relativePoint = "CENTER"/>
 				</Anchors>
-				<NormalTexture file = "Interface\AddOns\PallyPower\Icons\draghandle"/>
-				<CheckedTexture file = "Interface\AddOns\PallyPower\Icons\draghandle-checked"/>
+				<NormalTexture file = "Interface\AddOns\ShamanPower\Icons\draghandle"/>
+				<CheckedTexture file = "Interface\AddOns\ShamanPower\Icons\draghandle-checked"/>
 			</CheckButton>
-			<Frame name="PallyPowerHeader" toplevel="true" movable="true" enableMouse="true" resizable="true" frameStrata="LOW" inherits="SecureHandlerStateTemplate">
+			<Frame name="ShamanPowerHeader" toplevel="true" movable="true" enableMouse="true" resizable="true" frameStrata="LOW" inherits="SecureHandlerStateTemplate">
 				<Size x = "1" y = "1"/>
 				<Anchors>
 					<Anchor point = "CENTER" relativeTo = "$parent" relativePoint = "CENTER"/>
@@ -446,30 +446,30 @@
 		</Frames>
 	</Frame>
 
-	<!-- PallyPower Blessings Assignments Resizer -->
-	<Frame name = "PallyPowerScalingFrame" hidden = "true">
+	<!-- ShamanPower Blessings Assignments Resizer -->
+	<Frame name = "ShamanPowerScalingFrame" hidden = "true">
 		<Scripts>
 			<OnUpdate>
-				PallyPower_ScalingFrame_Update(self, elapsed);
+				ShamanPower_ScalingFrame_Update(self, elapsed);
 			</OnUpdate>
 		</Scripts>
 	</Frame>
 
-	<Button name = "PallyPowerResizeTemplate" virtual = "true">
+	<Button name = "ShamanPowerResizeTemplate" virtual = "true">
 		<Size>
 			<AbsDimension x = "16" y = "16"/>
 		</Size>
 		<Scripts>
 			<OnMouseDown>
-				PallyPower_StartScaling(self, button);
+				ShamanPower_StartScaling(self, button);
 			</OnMouseDown>
 			<OnMouseUp>
-				PallyPower_StopScaling(self, button);
+				ShamanPower_StopScaling(self, button);
 			</OnMouseUp>
 			<OnEnter>
-				if PallyPower.opt.ShowTooltips then
+				if ShamanPower.opt.ShowTooltips then
 					GameTooltip:SetOwner(self, "ANCHOR_RIGHT");
-					GameTooltip:SetText(PallyPower.CONFIG_RESIZEGRIP);
+					GameTooltip:SetText(ShamanPower.CONFIG_RESIZEGRIP);
 					GameTooltip:Show(self, motion);
 					CursorUpdate(self, motion);
 				end
@@ -478,11 +478,11 @@
 				GameTooltip:Hide(self, motion);
 			</OnLeave>
 		</Scripts>
-		<NormalTexture file = "Interface\AddOns\PallyPower\Icons\ResizeGrip"/>
-		<HighlightTexture file = "Interface\AddOns\PallyPower\Icons\ResizeGrip" alphaMode = "ADD"/>
+		<NormalTexture file = "Interface\AddOns\ShamanPower\Icons\ResizeGrip"/>
+		<HighlightTexture file = "Interface\AddOns\ShamanPower\Icons\ResizeGrip" alphaMode = "ADD"/>
 	</Button>
 
-	<!-- PallyPower Blessing Assignments -->
+	<!-- ShamanPower Blessing Assignments -->
 	<Button name = "ShamanPowerClassButtonTemplate" hidden = "false" virtual = "true">
 		<Size>
 			<AbsDimension x = "84" y = "80"/>
@@ -548,10 +548,10 @@
 				self:EnableMouseWheel(1);
 			</OnLoad>
 			<OnClick>
-				PallyPowerPlayerButton_OnClick(self, button, down);
+				ShamanPowerPlayerButton_OnClick(self, button, down);
 			</OnClick>
 			<OnMouseWheel>
-				PallyPowerPlayerButton_OnMouseWheel(self, delta);
+				ShamanPowerPlayerButton_OnMouseWheel(self, delta);
 			</OnMouseWheel>
 		</Scripts>
 	</Button>
@@ -764,10 +764,10 @@
 				self:EnableMouseWheel(1);
 			</OnLoad>
 			<OnClick>
-				PallyPowerGridButton_OnClick(self, button, down);
+				ShamanPowerGridButton_OnClick(self, button, down);
 			</OnClick>
 			<OnMouseWheel>
-				PallyPowerGridButton_OnMouseWheel(self, delta);
+				ShamanPowerGridButton_OnMouseWheel(self, delta);
 			</OnMouseWheel>
 		</Scripts>
 	</Button>
@@ -778,7 +778,7 @@
 		</Size>
 		<Layers>
 			<Layer level = "ARTWORK">
-				<Texture name = "$parentIcon" file = "Interface\AddOns\PallyPower\Icons\AuraMastery">
+				<Texture name = "$parentIcon" file = "Interface\AddOns\ShamanPower\Icons\AuraMastery">
 					<Size>
 						<AbsDimension x = "32" y = "32"/>
 					</Size>
@@ -935,10 +935,10 @@
 				self:EnableMouseWheel(1);
 			</OnLoad>
 			<OnClick>
-				PallyPowerAuraButton_OnClick(self, button, down);
+				ShamanPowerAuraButton_OnClick(self, button, down);
 			</OnClick>
 			<OnMouseWheel>
-				PallyPowerAuraButton_OnMouseWheel(self, delta);
+				ShamanPowerAuraButton_OnMouseWheel(self, delta);
 			</OnMouseWheel>
 		</Scripts>
 	</Button>
@@ -949,7 +949,7 @@
 		</Size>
 		<Layers>
 			<Layer level = "OVERLAY">
-				<FontString name = "$parentName" inherits = "GameFontHighlightSmall" text = "SomePally$parent" justifyH = "LEFT">
+				<FontString name = "$parentName" inherits = "GameFontHighlightSmall" text = "SomeShaman$parent" justifyH = "LEFT">
 					<Size>
 						<AbsDimension x = "932" y = "16"/>
 					</Size>
@@ -1461,7 +1461,7 @@
 		</Frames>
 	</Frame>
 
-	<Frame name = "PallyPowerBlessingsFrame" hidden = "true" toplevel = "true" frameStrata = "HIGH" enableMouse = "true" movable = "true" parent = "UIParent">
+	<Frame name = "ShamanPowerBlessingsFrame" hidden = "true" toplevel = "true" frameStrata = "HIGH" enableMouse = "true" movable = "true" parent = "UIParent">
 		<Size>
 			<AbsDimension x = "1010" y = "1200"/>
 		</Size>
@@ -1489,24 +1489,24 @@
 				</Anchors>
 				<Scripts>
 					<OnEnter>
-						PallyPowerBlessings_ShowCredits(self, motion);
+						ShamanPowerBlessings_ShowCredits(self, motion);
 					</OnEnter>
 					<OnLeave>
 						HideUIPanel(GameTooltip);
 					</OnLeave>
 					<OnMouseDown>
-						PallyPowerBlessingsFrame_MouseDown(self, button);
+						ShamanPowerBlessingsFrame_MouseDown(self, button);
 					</OnMouseDown>
 					<OnMouseUp>
-						PallyPowerBlessingsFrame_MouseUp();
+						ShamanPowerBlessingsFrame_MouseUp();
 					</OnMouseUp>
 					<OnUpdate>
-						PallyPowerBlessingsGrid_Update(self, elapsed);
+						ShamanPowerBlessingsGrid_Update(self, elapsed);
 					</OnUpdate>
 				</Scripts>
 				<Layers>
 					<Layer level = "OVERLAY">
-						<FontString name = "$parentText" inherits = "GameFontNormal" text = "PALLYPOWER_NAME" justifyH = "CENTER">
+						<FontString name = "$parentText" inherits = "GameFontNormal" text = "SHAMANPOWER_NAME" justifyH = "CENTER">
 							<Size>
 								<AbsDimension x = "400" y = "12"/>
 							</Size>
@@ -1699,7 +1699,7 @@
 					<Anchor point = "TOPLEFT" relativeTo = "$parentPlayer14" relativePoint = "BOTTOMLEFT"/>
 				</Anchors>
 			</Frame>
-			<Button name = "$parentResizeButton" inherits = "PallyPowerResizeTemplate" hidden = "false">
+			<Button name = "$parentResizeButton" inherits = "ShamanPowerResizeTemplate" hidden = "false">
 				<Anchors>
 					<Anchor point = "BOTTOMRIGHT">
 						<Offset>
@@ -1708,7 +1708,7 @@
 					</Anchor>
 				</Anchors>
 			</Button>
-			<Button name = "$parentRefresh" inherits = "GameMenuButtonTemplate" text = "PALLYPOWER_REFRESH" hidden = "false">
+			<Button name = "$parentRefresh" inherits = "GameMenuButtonTemplate" text = "SHAMANPOWER_REFRESH" hidden = "false">
 				<Size>
 					<AbsDimension x = "100" y = "20"/>
 				</Size>
@@ -1721,12 +1721,12 @@
 				</Anchors>
 				<Scripts>
 					<OnClick>
-						PallyPowerBlessings_Refresh(self, button, down);
+						ShamanPowerBlessings_Refresh(self, button, down);
 					</OnClick>
 					<OnEnter>
-						if PallyPower.opt.ShowTooltips then
+						if ShamanPower.opt.ShowTooltips then
 							GameTooltip:SetOwner(self, "ANCHOR_BOTTOM");
-							GameTooltip:SetText(PALLYPOWER_REFRESH_DESC);
+							GameTooltip:SetText(SHAMANPOWER_REFRESH_DESC);
 							GameTooltip:Show(self, motion);
 							CursorUpdate(self, motion);
 						end
@@ -1736,7 +1736,7 @@
 					</OnLeave>
 				</Scripts>
 			</Button>
-			<Button name = "$parentClear" inherits = "GameMenuButtonTemplate" text = "PALLYPOWER_CLEAR" hidden = "false">
+			<Button name = "$parentClear" inherits = "GameMenuButtonTemplate" text = "SHAMANPOWER_CLEAR" hidden = "false">
 				<Size>
 					<AbsDimension x = "100" y = "20"/>
 				</Size>
@@ -1749,12 +1749,12 @@
 				</Anchors>
 				<Scripts>
 					<OnClick>
-						PallyPowerBlessings_Clear(self, button, down);
+						ShamanPowerBlessings_Clear(self, button, down);
 					</OnClick>
 					<OnEnter>
-						if PallyPower.opt.ShowTooltips then
+						if ShamanPower.opt.ShowTooltips then
 							GameTooltip:SetOwner(self, "ANCHOR_BOTTOM");
-							GameTooltip:SetText(PALLYPOWER_CLEAR_DESC);
+							GameTooltip:SetText(SHAMANPOWER_CLEAR_DESC);
 							GameTooltip:Show(self, motion);
 							CursorUpdate(self, motion);
 						end
@@ -1764,7 +1764,7 @@
 					</OnLeave>
 				</Scripts>
 			</Button>
-			<Button name = "$parentAutoAssign" inherits = "GameMenuButtonTemplate" text = "PALLYPOWER_AUTOASSIGN" hidden = "false">
+			<Button name = "$parentAutoAssign" inherits = "GameMenuButtonTemplate" text = "SHAMANPOWER_AUTOASSIGN" hidden = "false">
 				<Size>
 					<AbsDimension x = "100" y = "20"/>
 				</Size>
@@ -1777,12 +1777,12 @@
 				</Anchors>
 				<Scripts>
 					<OnClick>
-						PallyPower:AutoAssign();
+						ShamanPower:AutoAssign();
 					</OnClick>
 					<OnEnter>
-						if PallyPower.opt.ShowTooltips then
+						if ShamanPower.opt.ShowTooltips then
 							GameTooltip:SetOwner(self, "ANCHOR_BOTTOM");
-							GameTooltip:SetText(PALLYPOWER_AUTOASSIGN_DESC);
+							GameTooltip:SetText(SHAMANPOWER_AUTOASSIGN_DESC);
 							GameTooltip:Show(self, motion);
 							CursorUpdate(self, motion);
 						end
@@ -1792,7 +1792,7 @@
 					</OnLeave>
 				</Scripts>
 			</Button>
-			<Button name = "$parentOptions" inherits = "GameMenuButtonTemplate" text = "PALLYPOWER_OPTIONS" hidden = "false">
+			<Button name = "$parentOptions" inherits = "GameMenuButtonTemplate" text = "SHAMANPOWER_OPTIONS" hidden = "false">
 				<Size>
 					<AbsDimension x = "100" y = "20"/>
 				</Size>
@@ -1805,12 +1805,12 @@
 				</Anchors>
 				<Scripts>
 					<OnClick>
-						PallyPower:OpenConfigWindow();
+						ShamanPower:OpenConfigWindow();
 					</OnClick>
 					<OnEnter>
-						if PallyPower.opt.ShowTooltips then
+						if ShamanPower.opt.ShowTooltips then
 							GameTooltip:SetOwner(self, "ANCHOR_BOTTOM");
-							GameTooltip:SetText(PALLYPOWER_OPTIONS_DESC);
+							GameTooltip:SetText(SHAMANPOWER_OPTIONS_DESC);
 							GameTooltip:Show(self, motion);
 							CursorUpdate(self, motion);
 						end
@@ -1820,7 +1820,7 @@
 					</OnLeave>
 				</Scripts>
 			</Button>			
-			<Button name = "$parentPreset" inherits = "GameMenuButtonTemplate" text = "PALLYPOWER_PRESET" hidden = "false">
+			<Button name = "$parentPreset" inherits = "GameMenuButtonTemplate" text = "SHAMANPOWER_PRESET" hidden = "false">
 				<Size>
 					<AbsDimension x = "100" y = "20"/>
 				</Size>
@@ -1835,15 +1835,15 @@
 					<OnClick>
 						if InCombatLockdown() then return end
 						if IsShiftKeyDown() then
-							PallyPower:StorePreset()
+							ShamanPower:StorePreset()
 						else
-							PallyPower:LoadPreset()
+							ShamanPower:LoadPreset()
 						end
 					</OnClick>
 					<OnEnter>
-						if PallyPower.opt.ShowTooltips then
+						if ShamanPower.opt.ShowTooltips then
 							GameTooltip:SetOwner(self, "ANCHOR_BOTTOM");
-							GameTooltip:SetText(PALLYPOWER_PRESET_DESC);
+							GameTooltip:SetText(SHAMANPOWER_PRESET_DESC);
 							GameTooltip:Show(self, motion);
 							CursorUpdate(self, motion);
 						end
@@ -1853,7 +1853,7 @@
 					</OnLeave>
 				</Scripts>
 			</Button>
-			<Button name = "$parentReport" inherits = "GameMenuButtonTemplate" text = "PALLYPOWER_REPORT" hidden = "false">
+			<Button name = "$parentReport" inherits = "GameMenuButtonTemplate" text = "SHAMANPOWER_REPORT" hidden = "false">
 				<Size>
 					<AbsDimension x = "120" y = "20"/>
 				</Size>
@@ -1866,16 +1866,16 @@
 				</Anchors>
 				<Scripts>
 					<OnClick>
-						if PallyPower.opt.ReportChannel >0 then
-							PallyPower:Report("CHANNEL", PallyPower.opt.ReportChannel);
+						if ShamanPower.opt.ReportChannel >0 then
+							ShamanPower:Report("CHANNEL", ShamanPower.opt.ReportChannel);
 						else
-							PallyPower:Report();
+							ShamanPower:Report();
 						end
 					</OnClick>
 					<OnEnter>
-						if PallyPower.opt.ShowTooltips then
+						if ShamanPower.opt.ShowTooltips then
 							GameTooltip:SetOwner(self, "ANCHOR_BOTTOM");
-							GameTooltip:SetText(PALLYPOWER_REPORT_DESC);
+							GameTooltip:SetText(SHAMANPOWER_REPORT_DESC);
 							GameTooltip:Show(self, motion);
 							CursorUpdate(self, motion);
 						end
@@ -1895,23 +1895,23 @@
 				</Anchors>
 				<Scripts>
 					<OnClick>
-						PallyPower.opt.freeassign = self:GetChecked();
-						if PallyPower.opt.freeassign then
-							PallyPower:SendMessage("FREEASSIGN YES");
-							if AllPallys[PallyPower.player] then
-								AllPallys[PallyPower.player].freeassign = true
+						ShamanPower.opt.freeassign = self:GetChecked();
+						if ShamanPower.opt.freeassign then
+							ShamanPower:SendMessage("FREEASSIGN YES");
+							if AllShamans[ShamanPower.player] then
+								AllShamans[ShamanPower.player].freeassign = true
 							end
 						else
-							PallyPower:SendMessage("FREEASSIGN NO");
-							if AllPallys[PallyPower.player] then
-								AllPallys[PallyPower.player].freeassign = false
+							ShamanPower:SendMessage("FREEASSIGN NO");
+							if AllShamans[ShamanPower.player] then
+								AllShamans[ShamanPower.player].freeassign = false
 							end
 						end
 					</OnClick>
 					<OnEnter>
-						if PallyPower.opt.ShowTooltips then
+						if ShamanPower.opt.ShowTooltips then
 							GameTooltip:SetOwner(self, "ANCHOR_BOTTOM");
-							GameTooltip:SetText(PALLYPOWER_FREEASSIGN_DESC);
+							GameTooltip:SetText(SHAMANPOWER_FREEASSIGN_DESC);
 							GameTooltip:Show(self, motion);
 							CursorUpdate(self, motion);
 						end
@@ -1924,12 +1924,12 @@
 		</Frames>
 		<Layers>
 			<Layer level = "OVERLAY">
-				<FontString name = "$parentFreeAssignText" inherits = "GameFontHighlightSmall" text = "PALLYPOWER_FREEASSIGN" justifyH = "LEFT">
+				<FontString name = "$parentFreeAssignText" inherits = "GameFontHighlightSmall" text = "SHAMANPOWER_FREEASSIGN" justifyH = "LEFT">
 					<Size>
 						<AbsDimension x = "100" y = "16"/>
 					</Size>
 					<Anchors>
-						<Anchor point = "BOTTOMLEFT" relativeTo = "PallyPowerBlessingsFrame" relativePoint = "BOTTOMLEFT">
+						<Anchor point = "BOTTOMLEFT" relativeTo = "ShamanPowerBlessingsFrame" relativePoint = "BOTTOMLEFT">
 							<Offset>
 								<AbsDimension x = "33" y = "9"/>
 							</Offset>
@@ -1954,10 +1954,10 @@
 				self:SetBackdropBorderColor(1, 1, 1, 1)
 			</OnLoad>
 			<OnMouseUp>
-				PallyPowerBlessingsFrame_MouseUp();
+				ShamanPowerBlessingsFrame_MouseUp();
 			</OnMouseUp>
 			<OnMouseDown>
-				PallyPowerBlessingsFrame_MouseDown(arg1);
+				ShamanPowerBlessingsFrame_MouseDown(arg1);
 			</OnMouseDown>
 			<OnHide>
 				if (self.isMoving) then

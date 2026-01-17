@@ -174,7 +174,7 @@ L["ShamanPower Buttons Scale"] = "ShamanPower Buttons Scale"
 L["This allows you to adjust the overall size of the ShamanPower Buttons"] = "This allows you to adjust the overall size of the ShamanPower Buttons"
 L["Change the way ShamanPower looks"] = "Change the way ShamanPower looks"
 
--- Options panel strings (adapted from PallyPower)
+-- Options panel strings (adapted from ShamanPower)
 L["[|cffffd200Enable|r/|cffffd200Disable|r] The Seal Button, Enable/Disable Righteous Fury or select the Seal you want to track."] = "[|cffffd200Enable|r/|cffffd200Disable|r] The Weapon Enchant Button, or select the enchant you want to track."
 L["Righteous Fury"] = "Lightning Shield"
 L["[Enable/Disable] Righteous Fury"] = "[Enable/Disable] Lightning Shield"

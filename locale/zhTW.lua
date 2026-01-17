@@ -1,4 +1,4 @@
-local L = LibStub("AceLocale-3.0"):NewLocale("PallyPower", "zhTW", false, false)
+local L = LibStub("AceLocale-3.0"):NewLocale("ShamanPower", "zhTW", false, false)
 if not L then return end 
 L["--- End of assignments ---"] = "--- 分配結束 ---"
 L["--- Paladin assignments ---"] = "--- 聖騎祝福分配 ---"
@@ -9,16 +9,16 @@ L["[|cffffd200Enable|r/|cffffd200Disable|r] The Drag Handle Button."] = "[|cffff
 L["[|cffffd200Enable|r/|cffffd200Disable|r] The Player(s) or Class Buttons."] = "[|cffffd200開啟|r/|cffffd200關閉|r] 玩家或職業按紐。"
 L["[|cffffd200Enable|r/|cffffd200Disable|r] The Seal Button, Enable/Disable Righteous Fury or select the Seal you want to track."] = "[|cffffd200開啟|r/|cffffd200關閉|r] 聖印按鈕，開啟/關閉正義之怒或選擇您要追踪的聖印。"
 L["[Enable/Disable] Class Buttons"] = "[開啟/關閉] 職業按鈕"
-L["[Enable/Disable] PallyPower"] = "[開啟/關閉] 聖騎威能"
-L["[Enable/Disable] PallyPower in Party"] = "[開啟/關閉] 聖騎威能在隊伍中"
-L["[Enable/Disable] PallyPower while Solo"] = "[開啟/關閉] 聖騎威能在單人時"
+L["[Enable/Disable] ShamanPower"] = "[開啟/關閉] 聖騎威能"
+L["[Enable/Disable] ShamanPower in Party"] = "[開啟/關閉] 聖騎威能在隊伍中"
+L["[Enable/Disable] ShamanPower while Solo"] = "[開啟/關閉] 聖騎威能在單人時"
 L["[Enable/Disable] Righteous Fury"] = "[開啟/關閉] 正義之怒監控"
 L["[Enable/Disable] The Aura Button"] = "[開啟/關閉] 光環按鈕"
 L["[Enable/Disable] The Auto Buff Button"] = "[開啟/關閉] 自動增益按鈕"
 L["[Enable/Disable] The Drag Handle"] = "[開啟/關閉] 拖曳定位點。"
 L["[Enable/Disable] The Seal Button"] = "[啟用/停用] 聖印按鈕"
 L["[Show/Hide] Minimap Icon"] = "[顯示/隱藏] 小地圖按鈕"
-L["[Show/Hide] The PallyPower Tooltips"] = "[顯示/隱藏] 聖騎威能滑鼠提示"
+L["[Show/Hide] The ShamanPower Tooltips"] = "[顯示/隱藏] 聖騎威能滑鼠提示"
 L["a Normal Blessing from:"] = "一個普通祝福來自；"
 L["Aura Button"] = "光環按鈕"
 L["Aura Tracker"] = "光環追蹤"
@@ -49,7 +49,7 @@ L["Change the Button Background Textures"] = "設定增益按鈕的自定義背�
 L["Change the Button Borders"] = "顯示玩家按鈕的邊框"
 L["Change the button settings"] = "改變這個按鈕設定"
 L["Change the status colors of the buff buttons"] = "改變增益按鈕狀態的顏色"
-L["Change the way PallyPower looks"] = "改變聖騎威能的外觀"
+L["Change the way ShamanPower looks"] = "改變聖騎威能的外觀"
 L["Class & Player Buttons"] = "職業與玩家按紐"
 L["Class Buttons"] = "玩家按紐"
 L["Clear"] = "清除"
@@ -59,7 +59,7 @@ L["DRAGHANDLE_TOOLTIP"] = [=[|cffffffff[左鍵點擊]|r |cffff0000鎖定|r/|cff0
 |cffffffff[按住左鍵]|r 移動聖騎威能 
 |cffffffff[點擊右鍵]|r 開啟祝福分配 
 |cffffffff[Shift+點擊右鍵]|r 開啟選項]=]
-L["Enable PallyPower"] = "開啟聖騎威能"
+L["Enable ShamanPower"] = "開啟聖騎威能"
 L["Free Assignment"] = "自由分配"
 L["FREE_ASSIGN_TOOLTIP"] = [=[允許他人改變你的祝福分配
 必需為團隊隊長/或有團隊助理權限。]=]
@@ -73,14 +73,14 @@ L["If this option is disabled it will also disable the Player Buttons and you wi
 L["If this option is disabled then Class and Player buttons will ignore buffs' duration, allowing buffs to be reapplied at will. This is especially useful for Protection Paladins when they spam Greater Blessings to generate more threat."] = "如果關閉此選項，插件將會忽略職業或玩家的增益持續時間，允許重複施放增益。這對於坦騎需要利用強效祝福來製造更多仇恨時相當實用。"
 L["If this option is disabled then you will no longer see the pop out buttons showing individual players and you will not be able to reapply Normal Blessings while in combat."] = "如果關閉這個選項，將不在彈出單一玩家按紐，同時在戰鬥中將無法施放祝福。"
 L["If this option is enabled then the Auto Buff Button and the Class Buff Button(s) will not auto buff a Greater Blessing if recipient(s) are not within the Paladins range (100yds). This range check excludes AFK, Dead and Offline players."] = "如果開啟這個選項，當有玩家暫離、死亡、離線或距離超過施法範圍(100碼)，自動增益按紐將不會對該職業施放強效祝福。"
-L["If you enable this option PallyPower will automatically over-write a Greater Blessing with a Normal Blessing on players marked with the |cffffd200Main Assistant|r role in the Blizzard Raid Panel. This is useful for spot buffing the |cffffd200Main Assistant|r role with Blessing of Sanctuary."] = "如果你開啟這個選項，聖騎威能將以普通祝福自動覆蓋暴雪團隊面板的|cffffd200主助攻|r 的強效祝福。 這在給施放 |cffffd200主助攻|r 庇護祝福祝福時這非常實用。"
-L["If you enable this option PallyPower will automatically over-write a Greater Blessing with a Normal Blessing on players marked with the |cffffd200Main Assistant|r role in the Blizzard Raid Panel. This is useful to avoid blessing the |cffffd200Main Assistant|r role with a Greater Blessing of Salvation."] = "如果你開啟這個選項，聖騎威能將以普通祝福自動覆蓋暴雪團隊面板的|cffffd200主助攻|r 的強效祝福。 在避免施放 |cffffd200主助攻|r 強效拯救祝福時這非常實用。"
-L["If you enable this option PallyPower will automatically over-write a Greater Blessing with a Normal Blessing on players marked with the |cffffd200Main Tank|r role in the Blizzard Raid Panel. This is useful for spot buffing the |cffffd200Main Tank|r role with Blessing of Sanctuary."] = "如果你開啟這個選項，聖騎威能將會自動用普通祝福覆蓋暴雪團隊框架上 |cffffd200主坦克|r 的強效祝福。這在給施放 |cffffd200主坦克|r 庇護祝福時，非常有用。"
-L["If you enable this option PallyPower will automatically over-write a Greater Blessing with a Normal Blessing on players marked with the |cffffd200Main Tank|r role in the Blizzard Raid Panel. This is useful to avoid blessing the |cffffd200Main Tank|r role with a Greater Blessing of Salvation."] = "如果你開啟這個選項，聖騎威能將會自動用普通祝福覆蓋暴雪團隊框架上 |cffffd200主坦克|r 的強效祝福。這在避免給 |cffffd200主坦克|r 強效拯救祝福時，非常有用。"
+L["If you enable this option ShamanPower will automatically over-write a Greater Blessing with a Normal Blessing on players marked with the |cffffd200Main Assistant|r role in the Blizzard Raid Panel. This is useful for spot buffing the |cffffd200Main Assistant|r role with Blessing of Sanctuary."] = "如果你開啟這個選項，聖騎威能將以普通祝福自動覆蓋暴雪團隊面板的|cffffd200主助攻|r 的強效祝福。 這在給施放 |cffffd200主助攻|r 庇護祝福祝福時這非常實用。"
+L["If you enable this option ShamanPower will automatically over-write a Greater Blessing with a Normal Blessing on players marked with the |cffffd200Main Assistant|r role in the Blizzard Raid Panel. This is useful to avoid blessing the |cffffd200Main Assistant|r role with a Greater Blessing of Salvation."] = "如果你開啟這個選項，聖騎威能將以普通祝福自動覆蓋暴雪團隊面板的|cffffd200主助攻|r 的強效祝福。 在避免施放 |cffffd200主助攻|r 強效拯救祝福時這非常實用。"
+L["If you enable this option ShamanPower will automatically over-write a Greater Blessing with a Normal Blessing on players marked with the |cffffd200Main Tank|r role in the Blizzard Raid Panel. This is useful for spot buffing the |cffffd200Main Tank|r role with Blessing of Sanctuary."] = "如果你開啟這個選項，聖騎威能將會自動用普通祝福覆蓋暴雪團隊框架上 |cffffd200主坦克|r 的強效祝福。這在給施放 |cffffd200主坦克|r 庇護祝福時，非常有用。"
+L["If you enable this option ShamanPower will automatically over-write a Greater Blessing with a Normal Blessing on players marked with the |cffffd200Main Tank|r role in the Blizzard Raid Panel. This is useful to avoid blessing the |cffffd200Main Tank|r role with a Greater Blessing of Salvation."] = "如果你開啟這個選項，聖騎威能將會自動用普通祝福覆蓋暴雪團隊框架上 |cffffd200主坦克|r 的強效祝福。這在避免給 |cffffd200主坦克|r 強效拯救祝福時，非常有用。"
 L["If you enable this option, you will not be allowed to assign Blessing of Wisdom to Warriors or Rogues, and Blessing of Might to Mages, Warlocks, or Hunters."] = "如果你開啟這個模式你將不允許對戰士盜賊上智慧祝福，或對法師術士上力量祝福。"
 L["If you enable this option, you will not be allowed to assign Blessing of Wisdom to Warriors, Rogues, or Death Knights and Blessing of Might to Mages, Warlocks, or Hunters."] = "如果你開啟這個模式你將不允許對戰士、盜賊或死騎施放智慧祝福，或對法師、術士或獵人施放力量祝福。"
 L["LAYOUT_TOOLTIP"] = "自訂螢幕配置"
-L["Main PallyPower Settings"] = "聖騎威能主設定"
+L["Main ShamanPower Settings"] = "聖騎威能主設定"
 L["Main Tank / Main Assist Roles"] = "主坦克 / 主助攻 分配"
 L["MAIN_ROLES_DESCRIPTION"] = [=[這些選項可用於為分配給戰士、德魯伊或聖騎士任何高級祝福及自動覆蓋普通祝福 |cffff0000僅限團隊使用|r 。
 通常 |cffffd200主坦克|r 和 |cffffd200主助攻|r 被用來設定為主坦克 和 副坦克（主助攻），但是一些團隊將 |cffffd200主坦克|r 設定為主坦克和副坦克，並將 |cffffd200主助攻|r 設定為治療者。 
@@ -100,8 +100,8 @@ L["OPTIONS_BUTTON_TOOLTIP"] = "打開聖騎威能插件選項面板。"
 L["Override Druids / Paladins..."] = "覆蓋 德魯伊 / 聖騎士..."
 L["Override Warriors / Death Knights..."] = "覆蓋 戰士 / 死亡騎士..."
 L["Override Warriors..."] = "覆蓋 戰士..."
-L["PallyPower Buttons Scale"] = "增益縮放"
-L["PallyPower Classic"] = "聖騎威能經典版"
+L["ShamanPower Buttons Scale"] = "增益縮放"
+L["ShamanPower Classic"] = "聖騎威能經典版"
 L["Partially Buffed"] = "部分增益缺失"
 L["Player Buttons"] = "玩家按紐"
 L["PP_CLEAR_TOOLTIP"] = "清除所有分配給自己、小隊、團隊的祝福。"
@@ -119,7 +119,7 @@ L["REPORT_CHANNEL_OPTION_TOOLTIP"] = [=[選擇你想要回報祝福分配的頻�
 |cffffd200[頻道列表]|r 依據你加入的頻道自動彈出的頻道選單。預設頻道例如交易、綜合頻道將會自動被過濾。
 
 |cffffff00注意：如果你改變頻道設定你將需要重新載入插件才會發送到正確的頻道。|r]=]
-L["Reset all PallyPower frames back to center"] = "重設所有聖騎威能的框架至螢幕中央"
+L["Reset all ShamanPower frames back to center"] = "重設所有聖騎威能的框架至螢幕中央"
 L["Reset Frames"] = "重置框架"
 L["RESIZEGRIP_TOOLTIP"] = [=[按住左鍵來調整大小 
 點擊右鍵來重置大小]=]
@@ -155,7 +155,7 @@ L["SHOWPETS_OPTION_TOOLTIP_VANILLA"] = [=[如果你開啟此選項，寵物將�
 |cffffff00注意；因為寵物分類的方式與強效祝福的方式不同。寵物則需要單獨施放祝福。 此外，術士的小鬼會自動隱藏，除非你按Shift切換。|r]=]
 L["Smart Buffs"] = "智能增益模式"
 L["This allows you to adjust the overall size of the Blessing Assignments Panel"] = "這允許你調整縮放祝福分配面板。"
-L["This allows you to adjust the overall size of the PallyPower Buttons"] = "設置增益條大小"
+L["This allows you to adjust the overall size of the ShamanPower Buttons"] = "設置增益條大小"
 L["Use in Party"] = "隊伍時顯示"
 L["Use when Solo"] = "單人時顯示"
 L["Vertical Down | Left"] = "垂直向下 | 左"
@@ -164,6 +164,6 @@ L["Vertical Up | Left"] = "垂直向上 | 左"
 L["Vertical Up | Right"] = "垂直向上 | 右"
 L["Visibility Settings"] = "顯示設定"
 L["Wait for Players"] = "啟用等待玩家"
-L["What to buff with PallyPower"] = "要用聖騎威能施放何種增益"
+L["What to buff with ShamanPower"] = "要用聖騎威能施放何種增益"
 L["While you are in a Raid dungeon, hide any players outside of the usual subgroups for that dungeon. For example, if you are in a 10-player dungeon, any players in Group 3 or higher will be hidden."] = "當您在團隊副本時，將所有在常規隊伍外的玩家隱藏。 例如，如果您在10人副本中，則第3隊或其他排在更後面的隊伍玩家都將被隱藏。"
 

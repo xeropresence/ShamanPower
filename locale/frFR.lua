@@ -1,4 +1,4 @@
-﻿local L = LibStub("AceLocale-3.0"):NewLocale("PallyPower", "frFR", false, false)
+﻿local L = LibStub("AceLocale-3.0"):NewLocale("ShamanPower", "frFR", false, false)
 if not L then return end 
 L["--- End of assignments ---"] = "--- Fin des affectations ---"
 L["--- Paladin assignments ---"] = "--- Affectations des paladin ---"
@@ -10,16 +10,16 @@ L["[|cffffd200Enable|r/|cffffd200Disable|r] The Player(s) or Class Buttons."] = 
 L["[|cffffd200Enable|r/|cffffd200Disable|r] The Seal Button, Enable/Disable Righteous Fury or select the Seal you want to track."] = "[|cffffd200Enable|r / |cffffd200Disable|r] Le bouton sceau, Activer / Désactiver Fureur vertueuse ou sélectionnez le sceau que vous souhaitez suivre."
 --[[Translation missing --]]
 L["[Enable/Disable] Class Buttons"] = "[Enable/Disable] Class Buttons"
-L["[Enable/Disable] PallyPower"] = "[Activer / désactiver] PallyPower"
-L["[Enable/Disable] PallyPower in Party"] = "[Activer / désactiver] PallyPower en groupe"
-L["[Enable/Disable] PallyPower while Solo"] = "[Activer / désactiver] PallyPower en solo"
+L["[Enable/Disable] ShamanPower"] = "[Activer / désactiver] ShamanPower"
+L["[Enable/Disable] ShamanPower in Party"] = "[Activer / désactiver] ShamanPower en groupe"
+L["[Enable/Disable] ShamanPower while Solo"] = "[Activer / désactiver] ShamanPower en solo"
 L["[Enable/Disable] Righteous Fury"] = "[Activer / désactiver] Fureur vertueuse"
 L["[Enable/Disable] The Aura Button"] = "[Activer / désactiver] le bouton Aura"
 L["[Enable/Disable] The Auto Buff Button"] = "[Activer / désactiver] le bouton de buff automatique"
 L["[Enable/Disable] The Drag Handle"] = "[Activer / désactiver] la poignée de déplacement"
 L["[Enable/Disable] The Seal Button"] = "[Activer / désactiver] le bouton sceau"
 L["[Show/Hide] Minimap Icon"] = "[Afficher / Masquer] Icône de minicarte"
-L["[Show/Hide] The PallyPower Tooltips"] = "[Afficher / Masquer] Les info-bulles PallyPower"
+L["[Show/Hide] The ShamanPower Tooltips"] = "[Afficher / Masquer] Les info-bulles ShamanPower"
 L["a Normal Blessing from:"] = "une bénédiction normale de:"
 L["Aura Button"] = "Bouton Aura"
 L["Aura Tracker"] = "Aura Tracker"
@@ -49,17 +49,17 @@ L["Change the Button Background Textures"] = "Modifier les textures d'arrière-p
 L["Change the Button Borders"] = "Changer les bordures des boutons"
 L["Change the button settings"] = "Modifier les paramètres des boutons"
 L["Change the status colors of the buff buttons"] = "Changer les couleurs d'état des boutons de buff"
-L["Change the way PallyPower looks"] = "Changer l'apparence de PallyPower"
+L["Change the way ShamanPower looks"] = "Changer l'apparence de ShamanPower"
 L["Class & Player Buttons"] = "Boutons de classe et de joueur"
 L["Class Buttons"] = "Boutons de classe"
 L["Clear"] = "Clear"
 L["Drag Handle"] = "Poignée de glissement"
 L["Drag Handle Button"] = "Bouton de déplacement"
-L["DRAGHANDLE_TOOLTIP"] = [=[|cffffffff [clic gauche]|r |cffff0000Lock|r / |cff00ff00Unlock|r PallyPower
-|cffffffff [Clic gauche]|r Déplacer PallyPower
+L["DRAGHANDLE_TOOLTIP"] = [=[|cffffffff [clic gauche]|r |cffff0000Lock|r / |cff00ff00Unlock|r ShamanPower
+|cffffffff [Clic gauche]|r Déplacer ShamanPower
 |cffffffff [Clic droit]|r Ouvrir les affectations de bénédiction
 |cffffffff [Maj + clic droit]|r Ouvrir les options]=]
-L["Enable PallyPower"] = "Activer PallyPower"
+L["Enable ShamanPower"] = "Activer ShamanPower"
 L["Free Assignment"] = "Affectation libre"
 L["FREE_ASSIGN_TOOLTIP"] = "Autorisez les autres à modifier vos bénédictions sans être RL ou raid assist"
 L["Fully Buffed"] = "Entièrement buffé"
@@ -74,17 +74,17 @@ L["If this option is disabled then Class and Player buttons will ignore buffs' d
 L["If this option is disabled then you will no longer see the pop out buttons showing individual players and you will not be able to reapply Normal Blessings while in combat."] = "Si cette option est désactivée, vous ne verrez plus les boutons contextuels montrant les joueurs individuels et vous ne pourrez pas réappliquer les bénédictions normales pendant le combat."
 L["If this option is enabled then the Auto Buff Button and the Class Buff Button(s) will not auto buff a Greater Blessing if recipient(s) are not within the Paladins range (100yds). This range check excludes AFK, Dead and Offline players."] = "Si cette option est activée, le bouton de buff automatique et les boutons de buff de classe ne buffent pas automatiquement une plus grande bénédiction si les destinataires ne sont pas dans la plage des paladins (100yds). Cette vérification de plage exclut AFK, Dead et les joueurs hors ligne. "
 --[[Translation missing --]]
-L["If you enable this option PallyPower will automatically over-write a Greater Blessing with a Normal Blessing on players marked with the |cffffd200Main Assistant|r role in the Blizzard Raid Panel. This is useful for spot buffing the |cffffd200Main Assistant|r role with Blessing of Sanctuary."] = "If you enable this option PallyPower will automatically over-write a Greater Blessing with a Normal Blessing on players marked with the |cffffd200Main Assistant|r role in the Blizzard Raid Panel. This is useful for spot buffing the |cffffd200Main Assistant|r role with Blessing of Sanctuary."
-L["If you enable this option PallyPower will automatically over-write a Greater Blessing with a Normal Blessing on players marked with the |cffffd200Main Assistant|r role in the Blizzard Raid Panel. This is useful to avoid blessing the |cffffd200Main Assistant|r role with a Greater Blessing of Salvation."] = "Si vous activez cette option, PallyPower écrasera automatiquement une Bénédiction supérieure avec une Bénédiction normale sur les joueurs marqués avec le rôle |cffffd200Main Assistant|r dans le panneau Blizzard Raid. Ceci est utile pour éviter de bénir les |cffffd200Main Assist|r rôle avec une bénédiction de salut supérieure"
+L["If you enable this option ShamanPower will automatically over-write a Greater Blessing with a Normal Blessing on players marked with the |cffffd200Main Assistant|r role in the Blizzard Raid Panel. This is useful for spot buffing the |cffffd200Main Assistant|r role with Blessing of Sanctuary."] = "If you enable this option ShamanPower will automatically over-write a Greater Blessing with a Normal Blessing on players marked with the |cffffd200Main Assistant|r role in the Blizzard Raid Panel. This is useful for spot buffing the |cffffd200Main Assistant|r role with Blessing of Sanctuary."
+L["If you enable this option ShamanPower will automatically over-write a Greater Blessing with a Normal Blessing on players marked with the |cffffd200Main Assistant|r role in the Blizzard Raid Panel. This is useful to avoid blessing the |cffffd200Main Assistant|r role with a Greater Blessing of Salvation."] = "Si vous activez cette option, ShamanPower écrasera automatiquement une Bénédiction supérieure avec une Bénédiction normale sur les joueurs marqués avec le rôle |cffffd200Main Assistant|r dans le panneau Blizzard Raid. Ceci est utile pour éviter de bénir les |cffffd200Main Assist|r rôle avec une bénédiction de salut supérieure"
 --[[Translation missing --]]
-L["If you enable this option PallyPower will automatically over-write a Greater Blessing with a Normal Blessing on players marked with the |cffffd200Main Tank|r role in the Blizzard Raid Panel. This is useful for spot buffing the |cffffd200Main Tank|r role with Blessing of Sanctuary."] = "If you enable this option PallyPower will automatically over-write a Greater Blessing with a Normal Blessing on players marked with the |cffffd200Main Tank|r role in the Blizzard Raid Panel. This is useful for spot buffing the |cffffd200Main Tank|r role with Blessing of Sanctuary."
-L["If you enable this option PallyPower will automatically over-write a Greater Blessing with a Normal Blessing on players marked with the |cffffd200Main Tank|r role in the Blizzard Raid Panel. This is useful to avoid blessing the |cffffd200Main Tank|r role with a Greater Blessing of Salvation."] = "Si vous activez cette option, PallyPower écrasera automatiquement une Bénédiction supérieure avec une Bénédiction normale sur les joueurs marqués avec le rôle |cffffd200Main Tank|r dans le panneau Blizzard Raid. Ceci est utile pour éviter de bénir le |cffffd200Main Tank|r rôle avec une bénédiction de salut supérieure. "
+L["If you enable this option ShamanPower will automatically over-write a Greater Blessing with a Normal Blessing on players marked with the |cffffd200Main Tank|r role in the Blizzard Raid Panel. This is useful for spot buffing the |cffffd200Main Tank|r role with Blessing of Sanctuary."] = "If you enable this option ShamanPower will automatically over-write a Greater Blessing with a Normal Blessing on players marked with the |cffffd200Main Tank|r role in the Blizzard Raid Panel. This is useful for spot buffing the |cffffd200Main Tank|r role with Blessing of Sanctuary."
+L["If you enable this option ShamanPower will automatically over-write a Greater Blessing with a Normal Blessing on players marked with the |cffffd200Main Tank|r role in the Blizzard Raid Panel. This is useful to avoid blessing the |cffffd200Main Tank|r role with a Greater Blessing of Salvation."] = "Si vous activez cette option, ShamanPower écrasera automatiquement une Bénédiction supérieure avec une Bénédiction normale sur les joueurs marqués avec le rôle |cffffd200Main Tank|r dans le panneau Blizzard Raid. Ceci est utile pour éviter de bénir le |cffffd200Main Tank|r rôle avec une bénédiction de salut supérieure. "
 L["If you enable this option, you will not be allowed to assign Blessing of Wisdom to Warriors or Rogues, and Blessing of Might to Mages, Warlocks, or Hunters."] = "Si vous activez cette option, vous ne serez pas autorisé à attribuer Bénédiction de sagesse aux guerriers ou voleurs et Bénédiction de puissance aux mages, sorciers et chasseurs."
 --[[Translation missing --]]
 L["If you enable this option, you will not be allowed to assign Blessing of Wisdom to Warriors, Rogues, or Death Knights and Blessing of Might to Mages, Warlocks, or Hunters."] = "If you enable this option, you will not be allowed to assign Blessing of Wisdom to Warriors, Rogues, or Death Knights and Blessing of Might to Mages, Warlocks, or Hunters."
 L["LAYOUT_TOOLTIP"] = [=[Vertical [Gauche / Droite]
 Horizontal [Haut / Bas]]=]
-L["Main PallyPower Settings"] = "Paramètres principaux de PallyPower"
+L["Main ShamanPower Settings"] = "Paramètres principaux de ShamanPower"
 L["Main Tank / Main Assist Roles"] = "Roles Tank et Main Assist"
 L["MAIN_ROLES_DESCRIPTION"] = [=[Ces options peuvent être utilisées pour attribuer automatiquement des bénédictions normales alternatives à toute bénédiction supérieure attribuée aux guerriers, aux druides ou aux paladins |cffff0000only|r.
 
@@ -103,13 +103,13 @@ L["MINIMAP_ICON_TOOLTIP"] = [=[|cffffffff [clic gauche]|r Ouvrir les affectation
 L["None"] = "Aucun"
 L["None Buffed"] = "Aucun buffé"
 L["Options"] = "Options"
-L["OPTIONS_BUTTON_TOOLTIP"] = "Ouvre le panneau d'options PallyPower"
+L["OPTIONS_BUTTON_TOOLTIP"] = "Ouvre le panneau d'options ShamanPower"
 L["Override Druids / Paladins..."] = "Surcharger pour les druides / paladins ..."
 --[[Translation missing --]]
 L["Override Warriors / Death Knights..."] = "Override Warriors / Death Knights..."
 L["Override Warriors..."] = "Surcharger pour les guerriers"
-L["PallyPower Buttons Scale"] = "Echelle des boutons PallyPower"
-L["PallyPower Classic"] = "PallyPower Classic"
+L["ShamanPower Buttons Scale"] = "Echelle des boutons ShamanPower"
+L["ShamanPower Classic"] = "ShamanPower Classic"
 L["Partially Buffed"] = "Partiellement buffé"
 L["Player Buttons"] = "Boutons de joueur"
 L["PP_CLEAR_TOOLTIP"] = "Efface toutes les affectations"
@@ -131,7 +131,7 @@ L["REPORT_CHANNEL_OPTION_TOOLTIP"] = [=[Définissez le canal souhaité pour diff
 |cffffd200 [Liste des chaînes]|r Une liste de canaux remplie automatiquement en fonction des canaux auxquelles le joueur appartient. Les canaux par défaut tels que Trade, General, etc. sont automatiquement filtrés de la liste.
 
 |cffffff00Remarque: si vous modifiez l'ordre des canaux, vous devrez recharger votre interface utilisateur et vérifier qu'elle diffuse sur le canal appropriée.|r]=]
-L["Reset all PallyPower frames back to center"] = "Réinitialiser la position de toutes les fenêtre pallypower au centre de l’écran"
+L["Reset all ShamanPower frames back to center"] = "Réinitialiser la position de toutes les fenêtre pallypower au centre de l’écran"
 L["Reset Frames"] = "Reset Frames"
 L["RESIZEGRIP_TOOLTIP"] = [=[Clic gauche pour redimensionner
 Le clic droit réinitialise la taille par défaut]=]
@@ -172,7 +172,7 @@ L["SHOWPETS_OPTION_TOOLTIP_VANILLA"] = [=[Si vous activez cette option, les anim
 |cffffff00Remarque: en raison de la manière dont les Bénédictions supérieures fonctionnent et de la façon dont les animaux domestiques sont classés, les animaux domestiques doivent être buff séparément. De plus, les diablotins démo seront masqué automatiquement à moins que le déphasage ne soit désactivé.|r]=]
 L["Smart Buffs"] = "Smart Buffs"
 L["This allows you to adjust the overall size of the Blessing Assignments Panel"] = "Cela vous permet d'ajuster la taille globale du panneau des affectations de bénédiction"
-L["This allows you to adjust the overall size of the PallyPower Buttons"] = "Cela vous permet d'ajuster la taille globale des boutons PallyPower"
+L["This allows you to adjust the overall size of the ShamanPower Buttons"] = "Cela vous permet d'ajuster la taille globale des boutons ShamanPower"
 L["Use in Party"] = "Utiliser en groupe"
 L["Use when Solo"] = "Utiliser en solo"
 L["Vertical Down | Left"] = "Vertical bas | Gauche"
@@ -182,7 +182,7 @@ L["Vertical Up | Right"] = "Vertical Up | Right"
 --[[Translation missing --]]
 L["Visibility Settings"] = "Visibility Settings"
 L["Wait for Players"] = "Attendre les joueurs"
-L["What to buff with PallyPower"] = "Que buff avec PallyPower"
+L["What to buff with ShamanPower"] = "Que buff avec ShamanPower"
 --[[Translation missing --]]
 L["While you are in a Raid dungeon, hide any players outside of the usual subgroups for that dungeon. For example, if you are in a 10-player dungeon, any players in Group 3 or higher will be hidden."] = "While you are in a Raid dungeon, hide any players outside of the usual subgroups for that dungeon. For example, if you are in a 10-player dungeon, any players in Group 3 or higher will be hidden."
 

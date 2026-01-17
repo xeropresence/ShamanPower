@@ -1,8 +1,8 @@
 <Bindings>
-	<Binding name="AUTOKEY1" category="SHAMANPOWER_KEYCAT">
+	<Binding name="SHAMANPOWER_AUTOKEY1" category="SHAMANPOWER_KEYCAT">
 		ShamanPower:AutoDrop("ShamanPowerAuto", "Hotkey1")
 	</Binding>
-	<Binding name="AUTOKEY2" category="SHAMANPOWER_KEYCAT">
+	<Binding name="SHAMANPOWER_AUTOKEY2" category="SHAMANPOWER_KEYCAT">
 		ShamanPower:AutoDrop("ShamanPowerAuto", "Hotkey2")
 	</Binding>
 </Bindings>

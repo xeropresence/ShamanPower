@@ -1033,7 +1033,7 @@
 		</Size>
 		<Layers>
 			<Layer level = "OVERLAY">
-				<FontString name = "$parentName" inherits = "GameFontHighlightSmall" text = "SomePally$parent" justifyH = "LEFT">
+				<FontString name = "$parentName" inherits = "GameFontHighlightSmall" text = "SomeShaman$parent" justifyH = "LEFT">
 					<Size>
 						<AbsDimension x = "130" y = "16"/>
 					</Size>
