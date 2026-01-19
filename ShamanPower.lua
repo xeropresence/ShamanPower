@@ -29,6 +29,7 @@ ShamanPower_Talents = {}
 ShamanPower_Assignments = {}
 ShamanPower_WeaponAssignments = {}
 ShamanPower_EarthShieldAssignments = {}  -- Maps shamanName -> targetName
+ShamanPower_TwistAssignments = {}  -- Maps shamanName -> true/false for totem twisting
 
 AllShamans = {}
 SyncList = {}
@@ -126,6 +127,16 @@ function ShamanPower:OnInitialize()
 	self.db.RegisterCallback(self, "OnProfileReset", "OnProfileChanged")
 
 	self.opt = self.db.profile
+
+	-- Sync twist setting from shared assignments table (source of truth for sync)
+	if ShamanPower_TwistAssignments and ShamanPower_TwistAssignments[self.player] ~= nil then
+		self.opt.enableTotemTwisting = ShamanPower_TwistAssignments[self.player]
+	elseif self.opt.enableTotemTwisting then
+		-- Initialize assignments table from local opt if it exists
+		ShamanPower_TwistAssignments = ShamanPower_TwistAssignments or {}
+		ShamanPower_TwistAssignments[self.player] = self.opt.enableTotemTwisting
+	end
+
 	self.options.args.profiles = LibStub("AceDBOptions-3.0"):GetOptionsTable(self.db)
 
 	LibStub("AceConfig-3.0"):RegisterOptionsTable("ShamanPower", self.options, {"sp", "shamanpower"})
@@ -228,6 +239,9 @@ function ShamanPower:OnInitialize()
 	end
 	if not ShamanPower_EarthShieldAssignments then
 		ShamanPower_EarthShieldAssignments = {}
+	end
+	if not ShamanPower_TwistAssignments then
+		ShamanPower_TwistAssignments = {}
 	end
 
 	local h = _G["ShamanPowerFrame"]
@@ -780,6 +794,54 @@ function ShamanPowerBlessingsGrid_Update(self, elapsed)
 				end
 			end
 
+			-- Create or update Twist checkbox for this shaman
+			local twistCheck = _G[fname .. "TwistCheck"]
+			if not twistCheck then
+				twistCheck = CreateFrame("CheckButton", fname .. "TwistCheck", playerFrame, "UICheckButtonTemplate")
+				twistCheck:SetSize(20, 20)
+				twistCheck:SetPoint("TOPLEFT", playerFrame, "TOPLEFT", 0, -32)
+				twistCheck.text = twistCheck:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+				twistCheck.text:SetPoint("LEFT", twistCheck, "RIGHT", 2, 0)
+				twistCheck.text:SetText("Twist")
+			end
+			-- Store fname reference for the click handler
+			twistCheck.shamanFrame = fname
+			-- Always update the click handler (in case code changed)
+			twistCheck:SetScript("OnClick", function(self)
+				local frameName = self.shamanFrame
+				local shamanName = _G[frameName .. "Name"]:GetText()
+				local enabled = self:GetChecked()
+				ShamanPower_TwistAssignments[shamanName] = enabled
+				-- Send the twist assignment to other clients
+				ShamanPower:SendMessage("TWIST " .. shamanName .. " " .. (enabled and "1" or "0"))
+				-- If this is us, update our local setting
+				if shamanName == ShamanPower.player then
+					ShamanPower.opt.enableTotemTwisting = enabled
+					ShamanPower:UpdateMiniTotemBar()
+					ShamanPower:UpdateSPMacros()
+					-- Refresh Options panel if it's open
+					LibStub("AceConfigRegistry-3.0"):NotifyChange("ShamanPower")
+					if enabled then
+						ShamanPower:SetupTwistTimer()
+					else
+						ShamanPower:HideTwistTimer()
+					end
+				end
+			end)
+			twistCheck:SetScript("OnEnter", function(self)
+				if ShamanPower.opt.ShowTooltips then
+					GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+					GameTooltip:SetText("Totem Twisting")
+					GameTooltip:AddLine("Enable Air totem twisting (Windfury + Grace of Air)", 1, 1, 1, true)
+					GameTooltip:Show()
+				end
+			end)
+			twistCheck:SetScript("OnLeave", function() GameTooltip:Hide() end)
+			-- Set checkbox state from saved data
+			local twistEnabled = ShamanPower_TwistAssignments[name] or false
+			twistCheck:SetChecked(twistEnabled)
+			twistCheck:Show()
+
 			-- Hide cooldown icons (CIcon1-2, CSkill1-2)
 			for id = 1, 2 do
 				local cicon = _G[fname .. "CIcon" .. id]
@@ -1255,6 +1317,144 @@ function ShamanPower:UpdatePulseGlow(element, totemData, startTime)
 	else
 		glow:SetAlpha(0)
 		glow:Hide()
+	end
+end
+
+-- ============================================================================
+-- Totem Twisting Timer (visual countdown for Air totem twist window)
+-- ============================================================================
+
+ShamanPower.twistTimer = nil
+ShamanPower.twistCooldown = nil
+ShamanPower.TWIST_WINDOW = 10  -- Seconds before Windfury buff expires
+
+function ShamanPower:SetupTwistTimer()
+	if not self.opt.enableTotemTwisting then return end
+
+	local airButton = _G["ShamanPowerAutoTotem4"]
+	if not airButton then return end
+
+	-- Create cooldown frame if it doesn't exist
+	if not self.twistCooldown then
+		self.twistCooldown = CreateFrame("Cooldown", "ShamanPowerTwistCooldown", airButton, "CooldownFrameTemplate")
+		self.twistCooldown:SetAllPoints(airButton)
+		self.twistCooldown:SetDrawEdge(true)
+		self.twistCooldown:SetDrawSwipe(true)
+		self.twistCooldown:SetSwipeColor(1, 1, 1, 0.8)  -- White swipe
+		self.twistCooldown:SetHideCountdownNumbers(false)
+		self.twistCooldown:SetReverse(true)  -- Fills up instead of emptying
+	end
+
+	-- Create border glow for urgency
+	if not self.twistBorder then
+		self.twistBorder = airButton:CreateTexture("ShamanPowerTwistBorder", "OVERLAY", nil, 7)
+		self.twistBorder:SetPoint("TOPLEFT", airButton, "TOPLEFT", -2, 2)
+		self.twistBorder:SetPoint("BOTTOMRIGHT", airButton, "BOTTOMRIGHT", 2, -2)
+		self.twistBorder:SetTexture("Interface\\Buttons\\UI-ActionButton-Border")
+		self.twistBorder:SetBlendMode("ADD")
+		self.twistBorder:SetVertexColor(1, 1, 1)  -- White border
+		self.twistBorder:SetAlpha(0)
+		self.twistBorder:Hide()
+	end
+
+	-- Create tracking frame for Air totem changes
+	if not self.twistTrackFrame then
+		self.twistTrackFrame = CreateFrame("Frame")
+		self.twistTrackFrame:SetScript("OnUpdate", function(frame, elapsed)
+			self:UpdateTwistTimer()
+		end)
+	end
+	self.twistTrackFrame:Show()
+end
+
+function ShamanPower:HideTwistTimer()
+	if self.twistCooldown then
+		self.twistCooldown:Clear()
+	end
+	if self.twistBorder then
+		self.twistBorder:SetAlpha(0)
+		self.twistBorder:Hide()
+	end
+	if self.twistTrackFrame then
+		self.twistTrackFrame:Hide()
+	end
+end
+
+function ShamanPower:UpdateTwistTimer()
+	if not self.opt.enableTotemTwisting then
+		self:HideTwistTimer()
+		return
+	end
+
+	-- Check if Air totem is active (slot 4)
+	local haveTotem, name, startTime, duration = GetTotemInfo(4)
+
+	-- Update the Air button icon based on what's currently down
+	-- Show the NEXT totem to cast (opposite of what's active)
+	local airButton = _G["ShamanPowerAutoTotem4"]
+	local iconTexture = airButton and _G["ShamanPowerAutoTotem4Icon"]
+	if iconTexture then
+		local wfName = GetSpellInfo(25587) or "Windfury Totem"
+		local goaName = GetSpellInfo(25359) or "Grace of Air Totem"
+
+		if haveTotem and name then
+			-- Check which totem is down and show the other one's icon
+			if name:find("Windfury") then
+				-- Windfury is down, show Grace of Air icon (next to cast)
+				iconTexture:SetTexture("Interface\\Icons\\Spell_Nature_InvisibilityTotem")
+			elseif name:find("Grace") then
+				-- Grace of Air is down, show Windfury icon (next to cast)
+				iconTexture:SetTexture("Interface\\Icons\\Spell_Nature_Windfury")
+			else
+				-- Some other Air totem, show Windfury (first in sequence)
+				iconTexture:SetTexture("Interface\\Icons\\Spell_Nature_Windfury")
+			end
+		else
+			-- No totem down, show Windfury (first in sequence)
+			iconTexture:SetTexture("Interface\\Icons\\Spell_Nature_Windfury")
+		end
+	end
+
+	if haveTotem and startTime and startTime > 0 then
+		local elapsed = GetTime() - startTime
+		local remaining = self.TWIST_WINDOW - elapsed
+
+		-- Start cooldown animation if not already running for this totem drop
+		if not self.twistStartTime or self.twistStartTime ~= startTime then
+			self.twistStartTime = startTime
+			if self.twistCooldown then
+				self.twistCooldown:SetCooldown(startTime, self.TWIST_WINDOW)
+			end
+		end
+
+		-- Show urgency border when time is running low (last 3 seconds)
+		if self.twistBorder then
+			if remaining > 0 and remaining <= 3 then
+				-- Pulse the border with increasing urgency
+				local pulse = (math.sin(GetTime() * 6) + 1) / 2  -- Fast pulse
+				self.twistBorder:SetAlpha(0.5 + pulse * 0.5)
+				self.twistBorder:SetVertexColor(1, 0.3, 0.3)  -- Red when urgent
+				self.twistBorder:Show()
+			elseif remaining > 3 and remaining <= 5 then
+				-- Yellow warning
+				self.twistBorder:SetAlpha(0.4)
+				self.twistBorder:SetVertexColor(1, 1, 0.3)
+				self.twistBorder:Show()
+			else
+				self.twistBorder:SetAlpha(0)
+				self.twistBorder:Hide()
+			end
+		end
+	else
+		-- No Air totem active
+		self.twistStartTime = nil
+		if self.twistCooldown then
+			self.twistCooldown:Clear()
+		end
+		if self.twistBorder then
+			self.twistBorder:SetAlpha(0)
+			self.twistBorder:Hide()
+		end
 	end
 end
 
@@ -1930,15 +2130,26 @@ function ShamanPower:UpdateMiniTotemBar()
 
 			-- Clear old attributes first
 			totemButton:SetAttribute("type", nil)
+			totemButton:SetAttribute("type1", nil)
 			totemButton:SetAttribute("spell", nil)
+			totemButton:SetAttribute("spell1", nil)
+			totemButton:SetAttribute("macrotext1", nil)
 
-			-- Left-click: cast totem
-			if spellName then
+			-- Left-click: cast totem (or castsequence for Air totem twisting)
+			if element == 4 and self.opt.enableTotemTwisting then
+				-- Air totem with twisting: use castsequence macro
+				local wfName = GetSpellInfo(25587) or "Windfury Totem"
+				local goaName = GetSpellInfo(25359) or "Grace of Air Totem"
+				totemButton:SetAttribute("type1", "macro")
+				totemButton:SetAttribute("macrotext1", "/castsequence reset=10 " .. wfName .. ", " .. goaName)
+				-- Update icon to Windfury
+				local iconTexture = _G["ShamanPowerAutoTotem" .. element .. "Icon"]
+				if iconTexture then
+					iconTexture:SetTexture("Interface\\Icons\\Spell_Nature_Windfury")
+				end
+			elseif spellName then
 				totemButton:SetAttribute("type1", "spell")
 				totemButton:SetAttribute("spell1", spellName)
-			else
-				totemButton:SetAttribute("type1", nil)
-				totemButton:SetAttribute("spell1", nil)
 			end
 
 			-- Right-click: destroy totem (using macro to call DestroyTotem)
@@ -2008,6 +2219,13 @@ function ShamanPower:UpdateMiniTotemBar()
 
 	-- Setup keybindings for the buttons
 	self:SetupKeybindings()
+
+	-- Setup twist timer visual if twisting is enabled
+	if self.opt.enableTotemTwisting then
+		self:SetupTwistTimer()
+	else
+		self:HideTwistTimer()
+	end
 
 	-- Note: Macros are created manually via Options -> Buttons -> "Create/Update Macros" button
 	-- or /spmacros command. No automatic macro updates to avoid interfering with macro UI.
@@ -3310,6 +3528,34 @@ function ShamanPower:ParseMessage(sender, msg)
 		class = class + 0
 		skill = skill + 0
 		ShamanPower_Assignments[name][class] = skill
+	end
+
+	-- Handle TWIST message for totem twisting assignment
+	if strfind(msg, "^TWIST") then
+		local _, _, name, enabled = strfind(msg, "^TWIST (.*) (.*)")
+		name = self:RemoveRealmName(name)
+		if name ~= sender and not (leader or self.opt.freeassign) then
+			return false
+		end
+		local twistEnabled = (enabled == "1")
+		ShamanPower_TwistAssignments[name] = twistEnabled
+
+		-- If this is for us, update our local setting
+		if name == self.player then
+			self.opt.enableTotemTwisting = twistEnabled
+			self:UpdateMiniTotemBar()
+			self:UpdateSPMacros()
+			-- Refresh Options panel if it's open
+			LibStub("AceConfigRegistry-3.0"):NotifyChange("ShamanPower")
+			if twistEnabled then
+				self:SetupTwistTimer()
+			else
+				self:HideTwistTimer()
+			end
+		end
+
+		-- Update the UI
+		self:UpdateRoster()
 	end
 
 	if strfind(msg, "^PASSIGN") then
@@ -6178,7 +6424,13 @@ function ShamanPower:UpdateSPMacros()
 		local body = "#showtooltip\n/cast "
 		local icon = defaultIcons[element]
 
-		if totemIndex > 0 then
+		-- Special handling for Air totem when twisting is enabled
+		if element == 4 and self.opt.enableTotemTwisting then
+			local wfName = GetSpellInfo(25587) or "Windfury Totem"  -- Windfury Totem
+			local goaName = GetSpellInfo(25359) or "Grace of Air Totem"  -- Grace of Air Totem
+			body = "#showtooltip\n/castsequence reset=10 " .. wfName .. ", " .. goaName
+			icon = "Spell_Nature_Windfury"  -- Windfury icon
+		elseif totemIndex > 0 then
 			local spellID = self:GetTotemSpell(element, totemIndex)
 			if spellID then
 				local spellName = GetSpellInfo(spellID)
