@@ -4474,6 +4474,26 @@ function ShamanPower:CreateLayout()
 	self.Header = _G["ShamanPowerFrame"]
 	self.autoButton = CreateFrame("Button", "ShamanPowerAuto", self.Header, "SecureHandlerShowHideTemplate, SecureHandlerEnterLeaveTemplate, SecureHandlerStateTemplate, SecureActionButtonTemplate, ShamanPowerAutoButtonTemplate")
 	self.autoButton:RegisterForClicks("LeftButtonDown", "RightButtonDown")
+
+	-- ALT+drag to move the frame
+	self.autoButton:RegisterForDrag("LeftButton")
+	self.autoButton:HookScript("OnDragStart", function(btn)
+		if IsAltKeyDown() and not InCombatLockdown() then
+			local frame = ShamanPowerFrame
+			frame:SetMovable(true)
+			frame:StartMoving()
+			ShamanPower.isDragging = true
+		end
+	end)
+	self.autoButton:HookScript("OnDragStop", function(btn)
+		if ShamanPower.isDragging then
+			local frame = ShamanPowerFrame
+			frame:StopMovingOrSizing()
+			-- Save position
+			_, _, _, ShamanPower.opt.display.offsetX, ShamanPower.opt.display.offsetY = frame:GetPoint()
+			ShamanPower.isDragging = false
+		end
+	end)
 	self.rfButton = CreateFrame("Button", "ShamanPowerRF", self.Header, "ShamanPowerRFButtonTemplate")
 	self.rfButton:RegisterForClicks("LeftButtonDown", "RightButtonDown")
 	self.auraButton = CreateFrame("Button", "ShamanPowerAura", self.Header, "ShamanPowerAuraButtonTemplate")
