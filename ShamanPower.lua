@@ -1220,6 +1220,23 @@ function ShamanPower:CreatePulseOverlay(button)
 		container.glows[i] = glow
 	end
 
+	-- Create slide-down wipe overlay for pulse countdown
+	local wipeFrame = CreateFrame("Frame", nil, button)
+	wipeFrame:SetAllPoints(button)
+	wipeFrame:SetFrameLevel(button:GetFrameLevel() + 1)
+
+	-- White overlay that slides from top to bottom
+	local wipe = wipeFrame:CreateTexture(nil, "OVERLAY")
+	wipe:SetColorTexture(1, 1, 1, 0.7)  -- White for visibility
+	wipe:SetPoint("TOPLEFT", button, "TOPLEFT", 2, -2)
+	wipe:SetPoint("TOPRIGHT", button, "TOPRIGHT", -2, -2)
+	wipe:SetHeight(1)  -- Starts as thin line at top
+	wipe:Hide()
+
+	container.wipeFrame = wipeFrame
+	container.wipe = wipe
+	container.buttonHeight = button:GetHeight() - 4  -- Account for inset
+
 	container.SetAlpha = function(self, alpha)
 		for i, glow in ipairs(self.glows) do
 			glow:SetAlpha(alpha * (1.1 - i * 0.2))  -- Inner glows brighter
@@ -1234,6 +1251,26 @@ function ShamanPower:CreatePulseOverlay(button)
 		for _, glow in ipairs(self.glows) do glow:Hide() end
 	end
 
+	-- Update the wipe progress (0 = just pulsed/no coverage, 1 = about to pulse/full coverage)
+	container.UpdateWipe = function(self, progress)
+		if self.wipe then
+			if progress > 0 and progress < 1 then
+				-- Wipe slides down from top: height increases as we approach next pulse
+				local height = self.buttonHeight * progress
+				self.wipe:SetHeight(math.max(1, height))
+				self.wipe:Show()
+			else
+				self.wipe:Hide()
+			end
+		end
+	end
+
+	container.HideWipe = function(self)
+		if self.wipe then
+			self.wipe:Hide()
+		end
+	end
+
 	return container
 end
 
@@ -1243,6 +1280,8 @@ ShamanPower.PulsingTotems = {
 	["Tremor"] = { element = 1, slot = 2, interval = 3 },
 	["Earthbind"] = { element = 1, slot = 2, interval = 3 },
 	-- Water totems (element 3, slot 3)
+	["Mana Tide"] = { element = 3, slot = 3, interval = 3 },
+	["Healing Stream"] = { element = 3, slot = 3, interval = 2 },
 	["Poison Cleansing"] = { element = 3, slot = 3, interval = 5 },
 	["Disease Cleansing"] = { element = 3, slot = 3, interval = 5 },
 }
@@ -1290,6 +1329,10 @@ function ShamanPower:UpdatePulseGlow(element, totemData, startTime)
 	local glow = self.pulseOverlays[element]
 	if not glow then return end
 
+	-- Check if active overlay is showing for this element
+	local activeOverlay = self.activeTotemOverlays and self.activeTotemOverlays[element]
+	local useOverlay = activeOverlay and activeOverlay.isActive
+
 	if totemData and startTime then
 		local now = GetTime()
 		local totemAge = now - startTime
@@ -1298,7 +1341,26 @@ function ShamanPower:UpdatePulseGlow(element, totemData, startTime)
 		-- Calculate position within current pulse cycle (0 to 1)
 		local cyclePos = (totemAge % pulseInterval) / pulseInterval
 
-		-- Pulse brightens at the start of each cycle
+		-- Calculate wipe height
+		local buttonHeight = 22  -- Approximate button height minus insets
+
+		if useOverlay and activeOverlay.wipe then
+			-- Update overlay's wipe
+			if cyclePos > 0 and cyclePos < 1 then
+				local height = buttonHeight * cyclePos
+				activeOverlay.wipe:SetHeight(math.max(1, height))
+				activeOverlay.wipe:Show()
+			else
+				activeOverlay.wipe:Hide()
+			end
+			-- Hide main button's wipe
+			glow:UpdateWipe(-1)  -- Hide by passing invalid value
+		else
+			-- Update main button's wipe
+			glow:UpdateWipe(cyclePos)
+		end
+
+		-- Pulse brightens at the start of each cycle (the glow flash)
 		local alpha
 		if cyclePos < 0.15 then
 			-- Quick flash at pulse point
@@ -1307,16 +1369,38 @@ function ShamanPower:UpdatePulseGlow(element, totemData, startTime)
 			alpha = 0
 		end
 
-		if alpha > 0 then
-			glow:SetAlpha(alpha * 0.9)
-			glow:Show()
-		else
+		if useOverlay and activeOverlay.glows then
+			-- Update overlay's glows
+			for i, overlayGlow in ipairs(activeOverlay.glows) do
+				overlayGlow:SetAlpha(alpha * 0.9 * (1.1 - i * 0.2))
+			end
+			-- Hide main glows
 			glow:SetAlpha(0)
 			glow:Hide()
+		else
+			-- Update main button's glows
+			if alpha > 0 then
+				glow:SetAlpha(alpha * 0.9)
+				glow:Show()
+			else
+				glow:SetAlpha(0)
+				glow:Hide()
+			end
 		end
 	else
 		glow:SetAlpha(0)
 		glow:Hide()
+		glow:HideWipe()
+
+		-- Also hide overlay's pulse elements
+		if activeOverlay then
+			if activeOverlay.wipe then activeOverlay.wipe:Hide() end
+			if activeOverlay.glows then
+				for _, overlayGlow in ipairs(activeOverlay.glows) do
+					overlayGlow:SetAlpha(0)
+				end
+			end
+		end
 	end
 end
 
@@ -1672,10 +1756,21 @@ function ShamanPower:UpdatePartyRangeDots()
 
 		-- Check each element
 		for element = 1, 4 do
-			local dot = self.partyRangeDots[element] and self.partyRangeDots[element][partyIndex]
+			local mainDot = self.partyRangeDots[element] and self.partyRangeDots[element][partyIndex]
+
+			-- Check if active overlay is showing for this element
+			local activeOverlay = self.activeTotemOverlays and self.activeTotemOverlays[element]
+			local useOverlay = activeOverlay and activeOverlay.isActive and activeOverlay.dots
+			local overlayDot = useOverlay and activeOverlay.dots[partyIndex]
+
+			-- Determine which dot to update (overlay if active, else main)
+			local dot = useOverlay and overlayDot or mainDot
+
 			if dot then
 				if not exists then
 					dot:Hide()
+					-- Also hide the other dot
+					if useOverlay and mainDot then mainDot:Hide() end
 				else
 					local slot = self.ElementToSlot[element]
 					local haveTotem = slot and GetTotemInfo(slot)
@@ -1704,9 +1799,12 @@ function ShamanPower:UpdatePartyRangeDots()
 							end
 						end
 						dot:Show()
+						-- Hide the main dot when using overlay
+						if useOverlay and mainDot then mainDot:Hide() end
 					else
 						-- No totem active for this element
 						dot:Hide()
+						if useOverlay and mainDot then mainDot:Hide() end
 					end
 				end
 			end
@@ -1796,6 +1894,263 @@ function ShamanPower:UpdateTotemProgressBars()
 			else
 				bars.bg:Hide()
 				bars.bar:Hide()
+			end
+		end
+	end
+
+	-- Update active totem overlays
+	self:UpdateActiveTotemOverlays()
+end
+
+-- ============================================================================
+-- Active Totem Overlay (shows actual totem when different from assigned)
+-- ============================================================================
+
+ShamanPower.activeTotemOverlays = {}
+
+function ShamanPower:CreateActiveTotemOverlay(element)
+	local totemButton = _G["ShamanPowerAutoTotem" .. element]
+	if not totemButton then return nil end
+
+	local overlay = {}
+
+	-- Create a frame to hold the active totem icon (appears above the button)
+	local frame = CreateFrame("Frame", "ShamanPowerActiveOverlay" .. element, totemButton)
+	frame:SetSize(26, 26)
+	frame:SetPoint("BOTTOM", totemButton, "TOP", 0, 2)
+	frame:SetFrameLevel(totemButton:GetFrameLevel() + 5)
+	frame:Hide()
+
+	-- Background
+	local bg = frame:CreateTexture(nil, "BACKGROUND")
+	bg:SetAllPoints()
+	bg:SetColorTexture(0, 0, 0, 0.7)
+	overlay.bg = bg
+
+	-- Icon for the active totem
+	local icon = frame:CreateTexture(nil, "ARTWORK")
+	icon:SetPoint("TOPLEFT", 2, -2)
+	icon:SetPoint("BOTTOMRIGHT", -2, 2)
+	icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+	overlay.icon = icon
+
+	-- Border with element color
+	local colors = self.ElementColors[element]
+	local borderSize = 2
+	local r, g, b = colors.r, colors.g, colors.b
+
+	local borderTop = frame:CreateTexture(nil, "BORDER")
+	borderTop:SetPoint("TOPLEFT", 0, 0)
+	borderTop:SetPoint("TOPRIGHT", 0, 0)
+	borderTop:SetHeight(borderSize)
+	borderTop:SetColorTexture(r, g, b, 1)
+
+	local borderBottom = frame:CreateTexture(nil, "BORDER")
+	borderBottom:SetPoint("BOTTOMLEFT", 0, 0)
+	borderBottom:SetPoint("BOTTOMRIGHT", 0, 0)
+	borderBottom:SetHeight(borderSize)
+	borderBottom:SetColorTexture(r, g, b, 1)
+
+	local borderLeft = frame:CreateTexture(nil, "BORDER")
+	borderLeft:SetPoint("TOPLEFT", 0, 0)
+	borderLeft:SetPoint("BOTTOMLEFT", 0, 0)
+	borderLeft:SetWidth(borderSize)
+	borderLeft:SetColorTexture(r, g, b, 1)
+
+	local borderRight = frame:CreateTexture(nil, "BORDER")
+	borderRight:SetPoint("TOPRIGHT", 0, 0)
+	borderRight:SetPoint("BOTTOMRIGHT", 0, 0)
+	borderRight:SetWidth(borderSize)
+	borderRight:SetColorTexture(r, g, b, 1)
+
+	-- Create pulse wipe overlay on this frame
+	local wipe = frame:CreateTexture(nil, "OVERLAY")
+	wipe:SetColorTexture(1, 1, 1, 0.7)  -- White for visibility
+	wipe:SetPoint("TOPLEFT", frame, "TOPLEFT", 2, -2)
+	wipe:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -2, -2)
+	wipe:SetHeight(1)
+	wipe:Hide()
+	overlay.wipe = wipe
+
+	-- Create pulse glow textures on this frame
+	overlay.glows = {}
+	for i = 1, 3 do
+		local glow = frame:CreateTexture(nil, "OVERLAY", nil, 7)
+		local offset = 6 + (i * 4)
+		glow:SetPoint("TOPLEFT", frame, "TOPLEFT", -offset, offset)
+		glow:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", offset, -offset)
+		glow:SetTexture("Interface\\Buttons\\UI-ActionButton-Border")
+		glow:SetBlendMode("ADD")
+		glow:SetVertexColor(0.4, 1, 0.4)
+		glow:SetAlpha(0)
+		overlay.glows[i] = glow
+	end
+
+	-- Create range dots on this frame
+	overlay.dots = {}
+	for i = 1, 4 do
+		local dot = frame:CreateTexture(nil, "OVERLAY")
+		dot:SetTexture("Interface\\AddOns\\ShamanPower\\textures\\dot")
+		dot:SetSize(5, 5)
+		if i == 1 then
+			dot:SetPoint("TOPLEFT", frame, "TOPLEFT", 1, -1)
+		elseif i == 2 then
+			dot:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -1, -1)
+		elseif i == 3 then
+			dot:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", 1, 1)
+		else
+			dot:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -1, 1)
+		end
+		dot:SetVertexColor(1, 1, 1)
+		dot:Hide()
+		overlay.dots[i] = dot
+	end
+
+	overlay.frame = frame
+	overlay.buttonHeight = frame:GetHeight() - 4
+	return overlay
+end
+
+function ShamanPower:UpdateActiveTotemOverlays()
+	-- Safety checks for early calls before addon is fully initialized
+	if not self.player then return end
+	if not self.ElementToSlot then return end
+	if not self.Totems then return end
+	if not ShamanPower_Assignments then return end
+
+	local playerName = self.player
+	local assignments = ShamanPower_Assignments[playerName]
+	if not assignments then return end
+
+	for element = 1, 4 do
+		-- Create overlay if needed
+		if not self.activeTotemOverlays[element] then
+			self.activeTotemOverlays[element] = self:CreateActiveTotemOverlay(element)
+		end
+
+		local overlay = self.activeTotemOverlays[element]
+		local slot = self.ElementToSlot[element]
+
+		-- Only process if we have both overlay and slot
+		if overlay and slot then
+			local haveTotem, totemName, startTime, duration = GetTotemInfo(slot)
+
+			-- Get assigned totem info
+			local assignedIndex = assignments[element] or 0
+			local assignedSpellID = nil
+			local assignedName = nil
+			if assignedIndex > 0 then
+				assignedSpellID = self:GetTotemSpell(element, assignedIndex)
+				if assignedSpellID then
+					assignedName = GetSpellInfo(assignedSpellID)
+				end
+			end
+
+			-- Get the main icon texture
+			local iconTexture = _G["ShamanPowerAutoTotem" .. element .. "Icon"]
+
+			-- Check if active totem differs from assigned
+			local showOverlay = false
+			local activeIcon = nil
+
+			if haveTotem and totemName and totemName ~= "" then
+				-- Check if active totem matches assigned
+				local matches = false
+
+				-- Use pcall for string.find in case of pattern issues
+				if assignedName then
+					local ok1, result1 = pcall(string.find, totemName, assignedName, 1, true)
+					local ok2, result2 = pcall(string.find, assignedName, totemName, 1, true)
+					if (ok1 and result1) or (ok2 and result2) then
+						matches = true
+					end
+				end
+
+				-- Special case: totem twisting on Air
+				if element == 4 and self.opt and self.opt.enableTotemTwisting then
+					-- Twisting can have either Windfury or Grace of Air active
+					if totemName:find("Windfury") or totemName:find("Grace of Air") then
+						matches = true
+					end
+				end
+
+				if not matches then
+					-- Different totem is active - find its icon
+					showOverlay = true
+					-- Try to find the icon for the active totem
+					local totems = self.Totems[element]
+					if totems then
+						for idx, totemSpellID in pairs(totems) do
+							-- totemSpellID is directly the spell ID number
+							if totemSpellID and type(totemSpellID) == "number" then
+								local totemSpellName = GetSpellInfo(totemSpellID)
+								if totemSpellName then
+									local ok, found = pcall(string.find, totemName, totemSpellName, 1, true)
+									if ok and found then
+										activeIcon = self:GetTotemIcon(element, idx)
+										break
+									end
+								end
+							end
+						end
+					end
+					-- Fallback: try to get icon from spell name directly
+					if not activeIcon then
+						local _, _, icon = GetSpellInfo(totemName)
+						activeIcon = icon
+					end
+				end
+			end
+
+			local totemButton = _G["ShamanPowerAutoTotem" .. element]
+
+			if showOverlay and activeIcon and overlay.frame then
+				-- Show the active totem overlay
+				overlay.icon:SetTexture(activeIcon)
+				overlay.frame:Show()
+				overlay.isActive = true
+
+				-- Grey out the assigned totem icon
+				if iconTexture then
+					iconTexture:SetDesaturated(true)
+					iconTexture:SetAlpha(0.5)
+				end
+
+				-- Note: Range dots are handled by UpdatePartyRangeDots()
+				-- which checks overlay.isActive and updates the correct dots
+
+				-- Hide main button's pulse overlay (we'll use overlay's)
+				if self.pulseOverlays and self.pulseOverlays[element] then
+					local pulse = self.pulseOverlays[element]
+					if pulse.wipe then pulse.wipe:Hide() end
+					for _, glow in ipairs(pulse.glows or {}) do
+						glow:SetAlpha(0)
+					end
+				end
+			else
+				-- Hide overlay, restore normal icon
+				if overlay.frame then
+					overlay.frame:Hide()
+				end
+				overlay.isActive = false
+
+				-- Hide overlay's dots and pulse
+				if overlay.dots then
+					for i = 1, 4 do
+						if overlay.dots[i] then overlay.dots[i]:Hide() end
+					end
+				end
+				if overlay.wipe then overlay.wipe:Hide() end
+				if overlay.glows then
+					for _, glow in ipairs(overlay.glows) do
+						glow:SetAlpha(0)
+					end
+				end
+
+				if iconTexture then
+					iconTexture:SetDesaturated(false)
+					iconTexture:SetAlpha(1)
+				end
 			end
 		end
 	end
