@@ -1,10 +1,10 @@
 # ShamanPower Changelog
 
 ## [v1.3.3](https://github.com/taubut/ShamanPower/tree/beta) (2026-01-20)
-- Add "Fluffy Settings" tab for UI customization (dedicated to FluffyKable)
+- Add "Look & Feel" tab for UI customization (dedicated to FluffyKable)
 - Add Button Padding sliders for Totem Bar and Cooldown Bar spacing
-- Move Layout dropdown and Totem Assignments Scale to Fluffy Settings
-- Reorganize options: move UI settings from Settings/Buttons tabs to Fluffy Settings
+- Move Layout dropdown and Totem Assignments Scale to Look & Feel
+- Reorganize options: move UI settings from Settings/Buttons tabs to Look & Feel
 
 ## [v1.3.2](https://github.com/taubut/ShamanPower/releases/tag/v1.3.2) (2026-01-20)
 - Add "Unlock Cooldown Bar" option to move CD bar independently from totem bar

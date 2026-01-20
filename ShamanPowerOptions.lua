@@ -1202,7 +1202,7 @@ ShamanPower.options = {
 		},
 		fluffy = {
 			order = 3,
-			name = "Fluffy Settings",
+			name = "Look & Feel",
 			desc = "UI customization options (requested by FluffyKable)",
 			type = "group",
 			cmdHidden = true,
@@ -1213,7 +1213,7 @@ ShamanPower.options = {
 				fluffy_header = {
 					order = 0,
 					type = "description",
-					name = "|cffffd200Fluffy Settings|r\nUI customization options - dedicated to FluffyKable from the Shaman Discord.\n",
+					name = "    |cffffd200Fluffy Settings|r\n    UI customization options - dedicated to |cff0070deFluffyKable|r from the Shaman Discord.",
 					fontSize = "medium",
 				},
 				layout_section = {
