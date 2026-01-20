@@ -269,6 +269,9 @@ function ShamanPower:OnEnable()
 	self:RegisterEvent("PLAYER_ROLES_ASSIGNED")
 	self:RegisterEvent("UPDATE_BINDINGS", "BindKeys")
 	self:RegisterEvent("CHANNEL_UI_UPDATE", "ReportChannels")
+	self:RegisterEvent("CHARACTER_POINTS_CHANGED", "OnTalentsChanged")  -- Classic talent changes
+	self:RegisterEvent("PLAYER_TALENT_UPDATE", "OnTalentsChanged")  -- Talent updates
+	self:RegisterEvent("ACTIVE_TALENT_GROUP_CHANGED", "OnTalentsChanged")  -- Wrath dual spec switch
 	self:RegisterBucketEvent("SPELLS_CHANGED", 1, "SPELLS_CHANGED")
 	self:RegisterBucketEvent("PLAYER_ENTERING_WORLD", 2, "PLAYER_ENTERING_WORLD")
 	self:RegisterBucketEvent({"GROUP_ROSTER_UPDATE", "PLAYER_REGEN_ENABLED", "UNIT_PET", "UNIT_AURA"}, 1, "UpdateRoster")
@@ -5451,6 +5454,25 @@ function ShamanPower:ScanTalents()
 	end
 end
 
+-- Called when talents change (respec, dual spec switch, etc.)
+function ShamanPower:OnTalentsChanged()
+	if InCombatLockdown() then
+		-- Queue for after combat
+		self.talentChangePending = true
+		return
+	end
+
+	-- Rescan talents and spells
+	self:ScanTalents()
+	self:ScanSpells()
+
+	-- Recreate cooldown bar to pick up new talent-based abilities (NS, Mana Tide, etc.)
+	self:RecreateCooldownBar()
+
+	-- Update keybindings for the new buttons
+	self:SetupKeybindings()
+end
+
 function ShamanPower:ScanSpells()
 	--self:Debug("[ScanSpells]")
 	if isShaman then
@@ -9171,6 +9193,11 @@ keybindEventFrame:SetScript("OnEvent", function(self, event)
 	if event == "PLAYER_REGEN_ENABLED" then
 		if ShamanPower.keybindsPending then
 			ShamanPower:SetupKeybindings()
+		end
+		-- Handle pending talent change from combat
+		if ShamanPower.talentChangePending then
+			ShamanPower.talentChangePending = false
+			ShamanPower:OnTalentsChanged()
 		end
 		return
 	end
