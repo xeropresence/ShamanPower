@@ -106,8 +106,10 @@ SHAMANPOWER_DEFAULT_VALUES = {
         cooldownBarLocked = true,  -- When false, CD bar can be moved independently from totem bar
         cooldownBarFrameLocked = false,  -- When CD bar is independent, this locks its position (red=locked, green=movable)
         cooldownBarScale = 0.90,  -- Separate scale for CD bar
-        cooldownBarPosX = 0,  -- Saved X position (offset from UIParent CENTER, same as totem bar)
-        cooldownBarPosY = -50,  -- Saved Y position (offset from UIParent CENTER, same as totem bar)
+        cooldownBarPoint = "CENTER",  -- Saved anchor point
+        cooldownBarRelPoint = "CENTER",  -- Saved relative anchor point
+        cooldownBarPosX = 0,  -- Saved X position offset
+        cooldownBarPosY = -50,  -- Saved Y position offset
         showTotemFlyouts = true,  -- Show flyout menus on mouseover for quick totem selection
         hideEarthShieldText = false,  -- Hide the Earth Shield target name text on totem bar
         preferredShield = 1,  -- Preferred shield: 1=Lightning Shield, 2=Water Shield

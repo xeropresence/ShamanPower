@@ -2725,7 +2725,12 @@ function ShamanPower:CreateCooldownBar()
 		self:StopMovingOrSizing()
 		-- Only save position if we were actually dragging
 		if ShamanPower.cooldownBarDragging then
-			_, _, _, ShamanPower.opt.cooldownBarPosX, ShamanPower.opt.cooldownBarPosY = self:GetPoint()
+			-- Save full anchor info so restore uses exact same positioning
+			local point, _, relPoint, x, y = self:GetPoint()
+			ShamanPower.opt.cooldownBarPoint = point
+			ShamanPower.opt.cooldownBarRelPoint = relPoint
+			ShamanPower.opt.cooldownBarPosX = x
+			ShamanPower.opt.cooldownBarPosY = y
 			ShamanPower.cooldownBarDragging = false
 		end
 	end)
@@ -2768,7 +2773,12 @@ function ShamanPower:CreateCooldownBar()
 		ShamanPower.cooldownBar:StopMovingOrSizing()
 		-- Only save position if we were actually dragging
 		if ShamanPower.cooldownBarDragging then
-			_, _, _, ShamanPower.opt.cooldownBarPosX, ShamanPower.opt.cooldownBarPosY = ShamanPower.cooldownBar:GetPoint()
+			-- Save full anchor info so restore uses exact same positioning
+			local point, _, relPoint, x, y = ShamanPower.cooldownBar:GetPoint()
+			ShamanPower.opt.cooldownBarPoint = point
+			ShamanPower.opt.cooldownBarRelPoint = relPoint
+			ShamanPower.opt.cooldownBarPosX = x
+			ShamanPower.opt.cooldownBarPosY = y
 			ShamanPower.cooldownBarDragging = false
 		end
 	end)
@@ -3295,7 +3305,8 @@ function ShamanPower:UpdateCooldownButtons()
 			-- Check cooldown
 			local start, duration, enabled = GetSpellCooldown(btn.spellID)
 			if start and start > 0 and duration > 1.5 then
-				btn.cooldown:SetCooldown(start, duration)
+				-- Clear radial swipe - use vertical grey sweep instead (like shields/imbues)
+				btn.cooldown:Clear()
 				btn.darkOverlay:Hide()
 				btn.icon:SetDesaturated(false)
 
@@ -3316,7 +3327,7 @@ function ShamanPower:UpdateCooldownButtons()
 					btn.progressBar:Hide()
 				end
 
-				-- Grey sweep overlay
+				-- Grey sweep overlay (vertical, from top)
 				if showSweep and btn.greyOverlay then
 					local depletedPercent = 1 - percent
 					local greyHeight = buttonHeight * depletedPercent
@@ -3492,7 +3503,10 @@ function ShamanPower:UpdateCooldownBarPosition()
 			self.cooldownBar:SetFrameStrata("MEDIUM")
 			self.cooldownBar:SetFrameLevel(100)
 			self.cooldownBar:ClearAllPoints()
-			self.cooldownBar:SetPoint("CENTER", "UIParent", "CENTER", self.opt.cooldownBarPosX, self.opt.cooldownBarPosY)
+			-- Use saved anchor point if available, otherwise default to CENTER
+			local point = self.opt.cooldownBarPoint or "CENTER"
+			local relPoint = self.opt.cooldownBarRelPoint or "CENTER"
+			self.cooldownBar:SetPoint(point, UIParent, relPoint, self.opt.cooldownBarPosX, self.opt.cooldownBarPosY)
 		end
 
 		self.cooldownBar:EnableMouse(true)
