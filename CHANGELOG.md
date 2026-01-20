@@ -1,6 +1,12 @@
 # ShamanPower Changelog
 
-## [v1.3.2](https://github.com/taubut/ShamanPower/tree/beta) (2026-01-20)
+## [v1.3.3](https://github.com/taubut/ShamanPower/tree/beta) (2026-01-20)
+- Add "Look & Feel" tab for UI customization (dedicated to FluffyKable)
+- Add Button Padding sliders for Totem Bar and Cooldown Bar spacing
+- Move Layout dropdown and Totem Assignments Scale to Look & Feel
+- Reorganize options: move UI settings from Settings/Buttons tabs to Look & Feel
+
+## [v1.3.2](https://github.com/taubut/ShamanPower/releases/tag/v1.3.2) (2026-01-20)
 - Add "Unlock Cooldown Bar" option to move CD bar independently from totem bar
 - Add separate scale sliders for Totem Bar and Cooldown Bar
 - CD bar drag handle (green=movable, red=locked) when unlocked

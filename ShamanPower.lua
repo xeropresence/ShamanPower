@@ -2805,7 +2805,7 @@ function ShamanPower:CreateCooldownBar()
 
 	-- Create buttons for each tracked spell
 	local buttonSize = 22
-	local spacing = 8  -- Increased spacing to prevent cooldown text overlap
+	local spacing = self.opt.cooldownBarPadding or 2
 	local padding = 4
 	local numButtons = 0
 
@@ -3152,7 +3152,7 @@ function ShamanPower:UpdateCooldownBarLayout()
 
 	local bar = self.cooldownBar
 	local buttonSize = bar.buttonSize or 22
-	local spacing = bar.spacing or 8
+	local spacing = self.opt.cooldownBarPadding or 2
 	local padding = bar.padding or 4
 	local numButtons = #self.cooldownButtons
 	local isVertical = (self.opt.layout == "Vertical" or self.opt.layout == "VerticalLeft")
@@ -4370,7 +4370,7 @@ function ShamanPower:UpdateMiniTotemBar()
 	-- Determine layout orientation
 	local isHorizontal = (self.opt.layout == "Horizontal")
 	local buttonSize = 26
-	local spacing = 4
+	local spacing = self.opt.totemBarPadding or 2
 	local padding = 4
 	local separatorSize = 12  -- Extra gap for separator
 	local showDropAll = self.opt.showDropAllButton ~= false  -- Default to true if not set
@@ -4876,7 +4876,7 @@ function ShamanPower:RepositionEarthShieldButton()
 
 	local isHorizontal = (self.opt.layout == "Horizontal")
 	local buttonSize = 26
-	local spacing = 4
+	local spacing = self.opt.totemBarPadding or 2
 	local padding = 4
 	local separatorSize = 12
 	local showDropAll = self.opt.showDropAllButton ~= false

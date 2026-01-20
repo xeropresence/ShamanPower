@@ -110,6 +110,8 @@ SHAMANPOWER_DEFAULT_VALUES = {
         cooldownBarRelPoint = "CENTER",  -- Saved relative anchor point
         cooldownBarPosX = 0,  -- Saved X position offset
         cooldownBarPosY = -50,  -- Saved Y position offset
+        totemBarPadding = 2,  -- Padding between totem bar buttons (pixels)
+        cooldownBarPadding = 2,  -- Padding between cooldown bar buttons (pixels)
         showTotemFlyouts = true,  -- Show flyout menus on mouseover for quick totem selection
         hideEarthShieldText = false,  -- Hide the Earth Shield target name text on totem bar
         preferredShield = 1,  -- Preferred shield: 1=Lightning Shield, 2=Water Shield
