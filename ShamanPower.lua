@@ -3233,22 +3233,22 @@ function ShamanPower:CreateWeaponImbueButton()
 		end
 
 		GameTooltip:AddLine(" ")
-		GameTooltip:AddLine("|cff00ff00Left-click:|r Apply to Main Hand", 1, 1, 1)
-		if ShamanPower:CanDualWield() then
-			GameTooltip:AddLine("|cffffcc00Right-click:|r Apply to Off Hand", 1, 1, 1)
-		end
-		GameTooltip:AddLine("|cff888888Hold to show imbue menu|r", 0.7, 0.7, 0.7)
+		GameTooltip:AddLine("|cff00ff00Click:|r Show imbue menu", 1, 1, 1)
 		GameTooltip:Show()
 	end)
 	btn:SetScript("OnLeave", function()
 		GameTooltip:Hide()
 	end)
 
-	-- Set up click to show flyout
+	-- Set up click to toggle flyout (like totem flyouts)
 	btn:SetScript("OnClick", function(self, button, down)
-		if down then
-			-- Show flyout on mouse down
-			ShamanPower:ShowWeaponImbueFlyout(button)
+		if not down then
+			-- Toggle flyout on mouse up
+			if ShamanPower.weaponImbueFlyout and ShamanPower.weaponImbueFlyout:IsShown() then
+				ShamanPower.weaponImbueFlyout:Hide()
+			else
+				ShamanPower:ShowWeaponImbueFlyout(button)
+			end
 		end
 	end)
 
@@ -3436,14 +3436,11 @@ function ShamanPower:ShowWeaponImbueFlyout(button)
 	local padding = flyout.padding
 	local spacing = flyout.spacing
 
-	-- Determine flyout direction based on layout
-	-- For weapon imbues, go OPPOSITE direction from totem flyouts
+	-- Determine flyout direction based on layout (same as totem flyouts)
+	-- Horizontal bar: flyout goes VERTICAL (down/up)
+	-- Vertical bar: flyout goes HORIZONTAL (left/right)
 	local isHorizontalBar = (self.opt.layout == "Horizontal")
-	local isVerticalLeft = (self.opt.layout == "VerticalLeft")
-
-	-- If bar is horizontal: totem flyouts go vertical, so weapon flyout goes horizontal
-	-- If bar is vertical: totem flyouts go horizontal, so weapon flyout goes vertical
-	local flyoutIsHorizontal = isHorizontalBar
+	local flyoutIsHorizontal = not isHorizontalBar  -- Same direction as totem flyouts
 
 	-- Position buttons
 	if flyoutIsHorizontal then
@@ -3466,7 +3463,7 @@ function ShamanPower:ShowWeaponImbueFlyout(button)
 		end
 	end
 
-	-- Position flyout relative to button (opposite direction from totem flyouts)
+	-- Position flyout relative to button (same direction as totem flyouts)
 	self:PositionWeaponImbueFlyout(flyout, self.weaponImbueButton)
 
 	flyout:Show()
@@ -3481,7 +3478,7 @@ function ShamanPower:ShowWeaponImbueFlyout(button)
 	end)
 end
 
--- Position the weapon imbue flyout (opposite direction from totem flyouts)
+-- Position the weapon imbue flyout (same direction as totem flyouts)
 function ShamanPower:PositionWeaponImbueFlyout(flyout, imbueButton)
 	if not flyout or not imbueButton then return end
 
@@ -3506,23 +3503,8 @@ function ShamanPower:PositionWeaponImbueFlyout(flyout, imbueButton)
 	flyout:ClearAllPoints()
 
 	if isHorizontalBar then
-		-- Horizontal bar: weapon flyout goes HORIZONTAL (left/right)
-		-- Opposite of totem flyouts which go vertical
-		local spaceRight = screenWidth - buttonRight
-		local spaceLeft = buttonLeft
-
-		if spaceRight >= flyoutWidth + 2 then
-			flyout:SetPoint("LEFT", imbueButton, "RIGHT", 2, 0)
-		elseif spaceLeft >= flyoutWidth + 2 then
-			flyout:SetPoint("RIGHT", imbueButton, "LEFT", -2, 0)
-		elseif spaceRight >= spaceLeft then
-			flyout:SetPoint("LEFT", imbueButton, "RIGHT", 2, 0)
-		else
-			flyout:SetPoint("RIGHT", imbueButton, "LEFT", -2, 0)
-		end
-	else
-		-- Vertical bar: weapon flyout goes VERTICAL (up/down)
-		-- Opposite of totem flyouts which go horizontal
+		-- Horizontal bar: flyout goes VERTICAL (down preferably, up if no space)
+		-- Same as totem flyouts
 		local spaceAbove = screenHeight - buttonTop
 		local spaceBelow = buttonBottom
 
@@ -3534,6 +3516,35 @@ function ShamanPower:PositionWeaponImbueFlyout(flyout, imbueButton)
 			flyout:SetPoint("TOP", imbueButton, "BOTTOM", 0, -2)
 		else
 			flyout:SetPoint("BOTTOM", imbueButton, "TOP", 0, 2)
+		end
+	else
+		-- Vertical bar: flyout goes HORIZONTAL (left/right based on layout)
+		-- Same as totem flyouts - VerticalLeft prefers right, Vertical prefers left
+		local spaceRight = screenWidth - buttonRight
+		local spaceLeft = buttonLeft
+
+		if isVerticalLeft then
+			-- VerticalLeft: totems on left, prefer flyout to the RIGHT
+			if spaceRight >= flyoutWidth + 2 then
+				flyout:SetPoint("LEFT", imbueButton, "RIGHT", 2, 0)
+			elseif spaceLeft >= flyoutWidth + 2 then
+				flyout:SetPoint("RIGHT", imbueButton, "LEFT", -2, 0)
+			elseif spaceRight >= spaceLeft then
+				flyout:SetPoint("LEFT", imbueButton, "RIGHT", 2, 0)
+			else
+				flyout:SetPoint("RIGHT", imbueButton, "LEFT", -2, 0)
+			end
+		else
+			-- Vertical (Right): totems on right, prefer flyout to the LEFT
+			if spaceLeft >= flyoutWidth + 2 then
+				flyout:SetPoint("RIGHT", imbueButton, "LEFT", -2, 0)
+			elseif spaceRight >= flyoutWidth + 2 then
+				flyout:SetPoint("LEFT", imbueButton, "RIGHT", 2, 0)
+			elseif spaceLeft >= spaceRight then
+				flyout:SetPoint("RIGHT", imbueButton, "LEFT", -2, 0)
+			else
+				flyout:SetPoint("LEFT", imbueButton, "RIGHT", 2, 0)
+			end
 		end
 	end
 end
