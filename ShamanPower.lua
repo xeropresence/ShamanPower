@@ -3207,8 +3207,9 @@ function ShamanPower:CreateWeaponImbueButton()
 	timeText:SetText("")
 	btn.timeText = timeText
 
-	-- Tooltip
+	-- Show flyout on mouse enter (like totem flyouts)
 	btn:SetScript("OnEnter", function(self)
+		-- Show tooltip
 		GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
 		GameTooltip:SetText("Weapon Imbues")
 
@@ -3232,24 +3233,28 @@ function ShamanPower:CreateWeaponImbueButton()
 			end
 		end
 
-		GameTooltip:AddLine(" ")
-		GameTooltip:AddLine("|cff00ff00Click:|r Show imbue menu", 1, 1, 1)
 		GameTooltip:Show()
-	end)
-	btn:SetScript("OnLeave", function()
-		GameTooltip:Hide()
+
+		-- Show flyout on hover (don't show during combat)
+		if not InCombatLockdown() then
+			ShamanPower:ShowWeaponImbueFlyout()
+		end
 	end)
 
-	-- Set up click to toggle flyout (like totem flyouts)
-	btn:SetScript("OnClick", function(self, button, down)
-		if not down then
-			-- Toggle flyout on mouse up
-			if ShamanPower.weaponImbueFlyout and ShamanPower.weaponImbueFlyout:IsShown() then
-				ShamanPower.weaponImbueFlyout:Hide()
-			else
-				ShamanPower:ShowWeaponImbueFlyout(button)
-			end
+	-- Hide flyout when mouse leaves both button and flyout
+	local function CheckWeaponImbueMouseOver()
+		local flyout = ShamanPower.weaponImbueFlyout
+		if not flyout or not flyout:IsShown() then return end
+		if flyout:IsMouseOver() or btn:IsMouseOver() then
+			C_Timer.After(0.1, CheckWeaponImbueMouseOver)
+		else
+			flyout:Hide()
 		end
+	end
+
+	btn:SetScript("OnLeave", function()
+		GameTooltip:Hide()
+		C_Timer.After(0.1, CheckWeaponImbueMouseOver)
 	end)
 
 	-- Set default spell for quick cast (last used imbue or first known)
