@@ -613,30 +613,6 @@ ShamanPower.options = {
 								ShamanPower.opt.showTotemFlyouts = val
 							end
 						},
-						preferred_shield = {
-							order = 2.3,
-							type = "select",
-							name = "Shield Spell",
-							desc = "Select which shield spell is cast when clicking the shield button on the cooldown bar",
-							width = 1.0,
-							disabled = function(info)
-								return not ShamanPower.opt.showCooldownBar
-							end,
-							values = {
-								[1] = "Lightning Shield",
-								[2] = "Water Shield",
-							},
-							get = function(info)
-								return ShamanPower.opt.preferredShield or 1
-							end,
-							set = function(info, val)
-								ShamanPower.opt.preferredShield = val
-								-- Recreate cooldown bar to update the click action (must be out of combat)
-								if not InCombatLockdown() then
-									ShamanPower:RecreateCooldownBar()
-								end
-							end
-						},
 						drop_order_header = {
 							order = 2.5,
 							type = "description",
@@ -753,6 +729,205 @@ ShamanPower.options = {
 								end
 								ShamanPower.opt.dropOrder[4] = val
 								ShamanPower:UpdateDropAllButton()
+							end
+						},
+						cdbar_items_header = {
+							order = 2.95,
+							type = "description",
+							name = "\n|cffffd200Cooldown Bar Items:|r Choose which items to show",
+							fontSize = "medium",
+							hidden = function(info)
+								return not ShamanPower.opt.showCooldownBar
+							end,
+						},
+						cdbar_show_shields = {
+							order = 2.96,
+							type = "toggle",
+							name = "Shields",
+							desc = "Show Lightning/Water Shield button on cooldown bar",
+							width = 0.6,
+							hidden = function(info)
+								return not ShamanPower.opt.showCooldownBar
+							end,
+							get = function(info)
+								return ShamanPower.opt.cdbarShowShields ~= false
+							end,
+							set = function(info, val)
+								ShamanPower.opt.cdbarShowShields = val
+								if not InCombatLockdown() then
+									ShamanPower:RecreateCooldownBar()
+								end
+							end
+						},
+						cdbar_show_recall = {
+							order = 2.97,
+							type = "toggle",
+							name = "Recall",
+							desc = "Show Totemic Call button on cooldown bar",
+							width = 0.5,
+							hidden = function(info)
+								return not ShamanPower.opt.showCooldownBar
+							end,
+							get = function(info)
+								return ShamanPower.opt.cdbarShowRecall ~= false
+							end,
+							set = function(info, val)
+								ShamanPower.opt.cdbarShowRecall = val
+								if not InCombatLockdown() then
+									ShamanPower:RecreateCooldownBar()
+								end
+							end
+						},
+						cdbar_show_reincarnation = {
+							order = 2.98,
+							type = "toggle",
+							name = "Ankh",
+							desc = "Show Reincarnation cooldown on cooldown bar",
+							width = 0.5,
+							hidden = function(info)
+								return not ShamanPower.opt.showCooldownBar
+							end,
+							get = function(info)
+								return ShamanPower.opt.cdbarShowReincarnation ~= false
+							end,
+							set = function(info, val)
+								ShamanPower.opt.cdbarShowReincarnation = val
+								if not InCombatLockdown() then
+									ShamanPower:RecreateCooldownBar()
+								end
+							end
+						},
+						cdbar_show_ns = {
+							order = 2.981,
+							type = "toggle",
+							name = "NS",
+							desc = "Show Nature's Swiftness cooldown on cooldown bar",
+							width = 0.4,
+							hidden = function(info)
+								return not ShamanPower.opt.showCooldownBar
+							end,
+							get = function(info)
+								return ShamanPower.opt.cdbarShowNS ~= false
+							end,
+							set = function(info, val)
+								ShamanPower.opt.cdbarShowNS = val
+								if not InCombatLockdown() then
+									ShamanPower:RecreateCooldownBar()
+								end
+							end
+						},
+						cdbar_show_manatide = {
+							order = 2.982,
+							type = "toggle",
+							name = "Mana Tide",
+							desc = "Show Mana Tide Totem cooldown on cooldown bar",
+							width = 0.6,
+							hidden = function(info)
+								return not ShamanPower.opt.showCooldownBar
+							end,
+							get = function(info)
+								return ShamanPower.opt.cdbarShowManaTide ~= false
+							end,
+							set = function(info, val)
+								ShamanPower.opt.cdbarShowManaTide = val
+								if not InCombatLockdown() then
+									ShamanPower:RecreateCooldownBar()
+								end
+							end
+						},
+						cdbar_show_bloodlust = {
+							order = 2.983,
+							type = "toggle",
+							name = "BL/Hero",
+							desc = "Show Bloodlust/Heroism cooldown on cooldown bar",
+							width = 0.55,
+							hidden = function(info)
+								return not ShamanPower.opt.showCooldownBar
+							end,
+							get = function(info)
+								return ShamanPower.opt.cdbarShowBloodlust ~= false
+							end,
+							set = function(info, val)
+								ShamanPower.opt.cdbarShowBloodlust = val
+								if not InCombatLockdown() then
+									ShamanPower:RecreateCooldownBar()
+								end
+							end
+						},
+						cdbar_show_imbues = {
+							order = 2.984,
+							type = "toggle",
+							name = "Imbues",
+							desc = "Show Weapon Imbue button on cooldown bar",
+							width = 0.55,
+							hidden = function(info)
+								return not ShamanPower.opt.showCooldownBar
+							end,
+							get = function(info)
+								return ShamanPower.opt.cdbarShowImbues ~= false
+							end,
+							set = function(info, val)
+								ShamanPower.opt.cdbarShowImbues = val
+								if not InCombatLockdown() then
+									ShamanPower:RecreateCooldownBar()
+								end
+							end
+						},
+						cdbar_display_header = {
+							order = 2.99,
+							type = "description",
+							name = "\n|cffffd200Cooldown Display:|r Choose how cooldowns are shown",
+							fontSize = "medium",
+							hidden = function(info)
+								return not ShamanPower.opt.showCooldownBar
+							end,
+						},
+						cdbar_show_progress_bars = {
+							order = 2.991,
+							type = "toggle",
+							name = "Progress Bars",
+							desc = "Show colored progress bars on the edges of cooldown buttons",
+							width = 0.7,
+							hidden = function(info)
+								return not ShamanPower.opt.showCooldownBar
+							end,
+							get = function(info)
+								return ShamanPower.opt.cdbarShowProgressBars ~= false
+							end,
+							set = function(info, val)
+								ShamanPower.opt.cdbarShowProgressBars = val
+							end
+						},
+						cdbar_show_color_sweep = {
+							order = 2.992,
+							type = "toggle",
+							name = "Color Sweep",
+							desc = "Show greyed-out sweep overlay as time depletes",
+							width = 0.7,
+							hidden = function(info)
+								return not ShamanPower.opt.showCooldownBar
+							end,
+							get = function(info)
+								return ShamanPower.opt.cdbarShowColorSweep ~= false
+							end,
+							set = function(info, val)
+								ShamanPower.opt.cdbarShowColorSweep = val
+							end
+						},
+						cdbar_show_cd_text = {
+							order = 2.993,
+							type = "toggle",
+							name = "CD Text",
+							desc = "Show cooldown time remaining as text",
+							width = 0.55,
+							hidden = function(info)
+								return not ShamanPower.opt.showCooldownBar
+							end,
+							get = function(info)
+								return ShamanPower.opt.cdbarShowCDText ~= false
+							end,
+							set = function(info, val)
+								ShamanPower.opt.cdbarShowCDText = val
 							end
 						},
 						auto_wait = {

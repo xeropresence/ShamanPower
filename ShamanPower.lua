@@ -2673,13 +2673,13 @@ ShamanPower.cooldownButtons = {}
 -- Spells to track on the cooldown bar
 -- Format: {spellID, name, type} where type is "buff", "cooldown", or "shield"
 ShamanPower.TrackedCooldowns = {
-	{324, "Lightning Shield", "shield"},   -- Lightning/Water Shield (combined)
-	{36936, "Totemic Call", "cooldown"},  -- Totemic Call (recall totems)
-	{20608, "Reincarnation", "cooldown"},  -- Ankh cooldown
-	{16188, "Nature's Swiftness", "cooldown"},  -- NS cooldown (Resto talent)
-	{16190, "Mana Tide Totem", "cooldown"},  -- Mana Tide cooldown (Resto talent)
-	{2825, "Bloodlust", "cooldown"},  -- Bloodlust (Horde)
-	{32182, "Heroism", "cooldown"},  -- Heroism (Alliance)
+	{324, "Lightning Shield", "shield", "cdbarShowShields"},   -- Lightning/Water Shield (combined)
+	{36936, "Totemic Call", "cooldown", "cdbarShowRecall"},  -- Totemic Call (recall totems)
+	{20608, "Reincarnation", "cooldown", "cdbarShowReincarnation"},  -- Ankh cooldown
+	{16188, "Nature's Swiftness", "cooldown", "cdbarShowNS"},  -- NS cooldown (Resto talent)
+	{16190, "Mana Tide Totem", "cooldown", "cdbarShowManaTide"},  -- Mana Tide cooldown (Resto talent)
+	{2825, "Bloodlust", "cooldown", "cdbarShowBloodlust"},  -- Bloodlust (Horde)
+	{32182, "Heroism", "cooldown", "cdbarShowBloodlust"},  -- Heroism (Alliance)
 }
 
 -- Shield spell IDs for the combined shield button
@@ -2713,13 +2713,20 @@ function ShamanPower:CreateCooldownBar()
 	local numButtons = 0
 
 	for i, spellData in ipairs(self.TrackedCooldowns) do
-		local spellID, spellName, spellType = spellData[1], spellData[2], spellData[3]
+		local spellID, spellName, spellType, optionKey = spellData[1], spellData[2], spellData[3], spellData[4]
 		local name, _, icon = GetSpellInfo(spellID)
+
+		-- Check if this item is enabled in options (default to true if not set)
+		local isEnabled = (optionKey == nil) or (self.opt[optionKey] ~= false)
+		if not isEnabled then
+			-- Skip this item if disabled in options
+			name = nil  -- This will cause knowsSpell to be false
+		end
 
 		-- For shield type, check if player knows any shield spell
 		local knowsSpell = false
 		local defaultShieldSpell = nil
-		if spellType == "shield" then
+		if isEnabled and spellType == "shield" then
 			-- Check preferred shield first (use spell name for Classic compatibility)
 			local preferredShield = self.opt.preferredShield or 1
 			local preferredData = self.ShieldSpells[preferredShield]
@@ -2740,12 +2747,12 @@ function ShamanPower:CreateCooldownBar()
 					end
 				end
 			end
-		else
+		elseif isEnabled then
 			-- Try IsSpellKnown first, fall back to name check for Classic compatibility
 			knowsSpell = name and (IsSpellKnown(spellID) or PlayerKnowsSpellByName(spellName))
 		end
 
-		-- Only create button if player knows this spell
+		-- Only create button if player knows this spell and it's enabled
 		if knowsSpell then
 			numButtons = numButtons + 1
 
@@ -2774,6 +2781,32 @@ function ShamanPower:CreateCooldownBar()
 			dark:Hide()
 			btn.darkOverlay = dark
 
+			-- Progress bar (left edge)
+			local progressBar = btn:CreateTexture(nil, "OVERLAY")
+			progressBar:SetPoint("TOPRIGHT", btn, "TOPLEFT", -1, 0)
+			progressBar:SetSize(3, buttonSize)
+			progressBar:SetColorTexture(0.2, 0.8, 0.2, 0.9)
+			progressBar:Hide()
+			btn.progressBar = progressBar
+
+			-- Grey sweep overlay for visual timer
+			local greyOverlay = btn:CreateTexture(nil, "ARTWORK", nil, 1)
+			greyOverlay:SetPoint("TOPLEFT", btn, "TOPLEFT", 0, 0)
+			greyOverlay:SetPoint("TOPRIGHT", btn, "TOPRIGHT", 0, 0)
+			greyOverlay:SetHeight(0)
+			greyOverlay:SetTexture(icon)
+			greyOverlay:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+			greyOverlay:SetDesaturated(true)
+			greyOverlay:SetVertexColor(0.5, 0.5, 0.5)
+			greyOverlay:Hide()
+			btn.greyOverlay = greyOverlay
+
+			-- Time text for showing remaining duration
+			local timeText = btn:CreateFontString(nil, "OVERLAY", "NumberFontNormalSmall")
+			timeText:SetPoint("CENTER", btn, "CENTER", 0, 0)
+			timeText:SetText("")
+			btn.timeText = timeText
+
 			-- Charge count text for shield buttons (bottom right corner)
 			if spellType == "shield" then
 				local chargeText = btn:CreateFontString(nil, "OVERLAY", "NumberFontNormal")
@@ -2787,6 +2820,11 @@ function ShamanPower:CreateCooldownBar()
 			btn.spellName = spellName
 			btn.spellType = spellType
 			btn.defaultShieldSpell = defaultShieldSpell
+
+			-- Store reference to shield button for flyout
+			if spellType == "shield" then
+				self.shieldButton = btn
+			end
 
 			-- Set up click action
 			if spellType == "shield" then
@@ -2805,28 +2843,49 @@ function ShamanPower:CreateCooldownBar()
 				end
 			end
 
-			-- Tooltip
-			btn:SetScript("OnEnter", function(self)
-				GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-				if self.activeShieldID then
-					GameTooltip:SetSpellByID(self.activeShieldID)
-				elseif self.spellType == "shield" and self.defaultShieldSpell then
-					-- defaultShieldSpell is a spell name, use it directly
-					local spellName = self.defaultShieldSpell
-					local name, _, icon, _, _, _, spellID = GetSpellInfo(spellName)
-					if spellID then
-						GameTooltip:SetSpellByID(spellID)
+			-- Tooltip and flyout
+			if spellType == "shield" then
+				btn:SetScript("OnEnter", function(self)
+					GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+					GameTooltip:SetText("Shield Spells")
+					if self.activeShieldID then
+						local activeName = GetSpellInfo(self.activeShieldID)
+						GameTooltip:AddLine("Active: " .. (activeName or "Unknown"), 0, 1, 0)
 					else
-						GameTooltip:SetText(spellName)
+						GameTooltip:AddLine("No shield active", 1, 0.5, 0.5)
 					end
-				else
-					GameTooltip:SetSpellByID(self.spellID)
+					GameTooltip:Show()
+
+					-- Show flyout on hover (don't show during combat)
+					if not InCombatLockdown() then
+						ShamanPower:ShowShieldFlyout()
+					end
+				end)
+
+				-- Hide flyout when mouse leaves both button and flyout
+				local function CheckShieldMouseOver()
+					local flyout = ShamanPower.shieldFlyout
+					if flyout and flyout:IsShown() then
+						if not flyout:IsMouseOver() and not ShamanPower.shieldButton:IsMouseOver() then
+							flyout:Hide()
+						end
+					end
 				end
-				GameTooltip:Show()
-			end)
-			btn:SetScript("OnLeave", function()
-				GameTooltip:Hide()
-			end)
+
+				btn:SetScript("OnLeave", function()
+					GameTooltip:Hide()
+					C_Timer.After(0.3, CheckShieldMouseOver)
+				end)
+			else
+				btn:SetScript("OnEnter", function(self)
+					GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+					GameTooltip:SetSpellByID(self.spellID)
+					GameTooltip:Show()
+				end)
+				btn:SetScript("OnLeave", function()
+					GameTooltip:Hide()
+				end)
+			end
 
 			self.cooldownButtons[numButtons] = btn
 		end
@@ -2943,6 +3002,18 @@ function ShamanPower:RemoveCooldownButtonAlert(spellID)
 	end
 end
 
+-- Helper to get progress bar color based on time remaining (milliseconds)
+local function GetTimerBarColor(expiration)
+	local mins = expiration / 60000
+	if mins < 5 then
+		return 0.9, 0.2, 0.2  -- Red when critical
+	elseif mins < 10 then
+		return 0.9, 0.7, 0.2  -- Yellow/orange when low
+	else
+		return 0.2, 0.8, 0.2  -- Green when healthy
+	end
+end
+
 -- Update cooldown bar layout (horizontal or vertical)
 function ShamanPower:UpdateCooldownBarLayout()
 	if not self.cooldownBar then return end
@@ -2955,10 +3026,14 @@ function ShamanPower:UpdateCooldownBarLayout()
 	local numButtons = #self.cooldownButtons
 	local isVertical = (self.opt.layout == "Vertical" or self.opt.layout == "VerticalLeft")
 
+	-- Extra padding for progress bars (3px bar + 1px gap = 4px each side) when enabled
+	local showBars = self.opt.cdbarShowProgressBars ~= false
+	local extraPadding = showBars and 4 or 0
+
 	if isVertical then
 		-- Vertical: stack buttons top to bottom
 		local barHeight = (buttonSize * numButtons) + (spacing * (numButtons - 1)) + (padding * 2)
-		bar:SetSize(buttonSize + (padding * 2), barHeight)
+		bar:SetSize(buttonSize + (padding * 2) + (extraPadding * 2), barHeight)
 
 		for i, btn in ipairs(self.cooldownButtons) do
 			btn:ClearAllPoints()
@@ -2966,36 +3041,47 @@ function ShamanPower:UpdateCooldownBarLayout()
 		end
 	else
 		-- Horizontal: buttons left to right
-		local barWidth = (buttonSize * numButtons) + (spacing * (numButtons - 1)) + (padding * 2)
+		local barWidth = (buttonSize * numButtons) + (spacing * (numButtons - 1)) + (padding * 2) + (extraPadding * 2)
 		bar:SetSize(barWidth, buttonSize + (padding * 2))
 
 		for i, btn in ipairs(self.cooldownButtons) do
 			btn:ClearAllPoints()
-			btn:SetPoint("LEFT", bar, "LEFT", padding + (i - 1) * (buttonSize + spacing), 0)
+			btn:SetPoint("LEFT", bar, "LEFT", padding + extraPadding + (i - 1) * (buttonSize + spacing), 0)
 		end
 	end
 end
 
 function ShamanPower:UpdateCooldownButtons()
+	-- Get display options
+	local showBars = self.opt.cdbarShowProgressBars ~= false
+	local showSweep = self.opt.cdbarShowColorSweep ~= false
+	local showText = self.opt.cdbarShowCDText ~= false
+
 	for _, btn in ipairs(self.cooldownButtons) do
+		local buttonHeight = btn:GetHeight()
+
 		if btn.spellType == "shield" then
 			-- Check if any shield is active
 			local hasShield = false
 			local activeShieldID = nil
 			local activeShieldIcon = nil
+			local shieldDuration = 0
+			local shieldExpiration = 0
 
 			local shieldCharges = 0
 			for _, shieldData in ipairs(self.ShieldSpells) do
 				local shieldID, shieldName = shieldData[1], shieldData[2]
-				-- Use UnitBuff to get charges (count)
+				-- Use UnitBuff to get charges (count) and duration
 				for i = 1, 40 do
-					local name, icon, count = UnitBuff("player", i)
+					local name, icon, count, _, duration, expirationTime = UnitBuff("player", i)
 					if not name then break end
 					if name == shieldName then
 						hasShield = true
 						activeShieldID = shieldID
 						activeShieldIcon = icon
 						shieldCharges = count or 0
+						shieldDuration = duration or 0
+						shieldExpiration = expirationTime or 0
 						break
 					end
 				end
@@ -3007,8 +3093,16 @@ function ShamanPower:UpdateCooldownButtons()
 				btn.icon:SetDesaturated(false)
 				if activeShieldIcon then
 					btn.icon:SetTexture(activeShieldIcon)
+					if btn.greyOverlay then
+						btn.greyOverlay:SetTexture(activeShieldIcon)
+					end
 				end
 				btn.activeShieldID = activeShieldID
+
+				-- Calculate remaining time
+				local remaining = shieldExpiration - GetTime()
+				local maxDuration = shieldDuration > 0 and shieldDuration or 600  -- Default 10 min
+
 				-- Show charge count
 				if btn.chargeText then
 					if shieldCharges > 0 then
@@ -3017,14 +3111,53 @@ function ShamanPower:UpdateCooldownButtons()
 						btn.chargeText:SetText("")
 					end
 				end
+
+				-- Progress bar (for shields, show based on charges remaining)
+				if showBars and btn.progressBar and shieldDuration > 0 then
+					local percent = math.min(remaining / maxDuration, 1)
+					local barHeight = math.max(buttonHeight * percent, 1)
+					btn.progressBar:SetHeight(barHeight)
+					btn.progressBar:ClearAllPoints()
+					btn.progressBar:SetPoint("BOTTOMRIGHT", btn, "BOTTOMLEFT", -1, 0)
+					local r, g, b = GetTimerBarColor(remaining * 1000)
+					btn.progressBar:SetColorTexture(r, g, b, 0.9)
+					btn.progressBar:Show()
+				elseif btn.progressBar then
+					btn.progressBar:Hide()
+				end
+
+				-- Grey sweep overlay
+				if showSweep and btn.greyOverlay and shieldDuration > 0 then
+					local percent = math.min(remaining / maxDuration, 1)
+					local depletedPercent = 1 - percent
+					local greyHeight = buttonHeight * depletedPercent
+					if greyHeight > 1 then
+						btn.greyOverlay:ClearAllPoints()
+						btn.greyOverlay:SetPoint("TOPLEFT", btn, "TOPLEFT", 0, 0)
+						btn.greyOverlay:SetPoint("TOPRIGHT", btn, "TOPRIGHT", 0, 0)
+						btn.greyOverlay:SetHeight(greyHeight)
+						local texBottom = 0.08 + (depletedPercent * 0.84)
+						btn.greyOverlay:SetTexCoord(0.08, 0.92, 0.08, texBottom)
+						btn.greyOverlay:Show()
+					else
+						btn.greyOverlay:Hide()
+					end
+				elseif btn.greyOverlay then
+					btn.greyOverlay:Hide()
+				end
+
+				-- Time text (don't show for shields - charges are more relevant)
+				if btn.timeText then
+					btn.timeText:SetText("")
+				end
 			else
 				btn.darkOverlay:Show()
 				btn.icon:SetDesaturated(true)
 				btn.activeShieldID = nil
-				-- Clear charge count when no shield
-				if btn.chargeText then
-					btn.chargeText:SetText("")
-				end
+				if btn.chargeText then btn.chargeText:SetText("") end
+				if btn.progressBar then btn.progressBar:Hide() end
+				if btn.greyOverlay then btn.greyOverlay:Hide() end
+				if btn.timeText then btn.timeText:SetText("") end
 			end
 			btn.cooldown:Clear()
 
@@ -3035,10 +3168,60 @@ function ShamanPower:UpdateCooldownButtons()
 				btn.cooldown:SetCooldown(start, duration)
 				btn.darkOverlay:Hide()
 				btn.icon:SetDesaturated(false)
+
+				-- Calculate remaining time
+				local remaining = (start + duration) - GetTime()
+				local percent = math.min(remaining / duration, 1)
+
+				-- Progress bar
+				if showBars and btn.progressBar then
+					local barHeight = math.max(buttonHeight * percent, 1)
+					btn.progressBar:SetHeight(barHeight)
+					btn.progressBar:ClearAllPoints()
+					btn.progressBar:SetPoint("BOTTOMRIGHT", btn, "BOTTOMLEFT", -1, 0)
+					local r, g, b = GetTimerBarColor(remaining * 1000)
+					btn.progressBar:SetColorTexture(r, g, b, 0.9)
+					btn.progressBar:Show()
+				elseif btn.progressBar then
+					btn.progressBar:Hide()
+				end
+
+				-- Grey sweep overlay
+				if showSweep and btn.greyOverlay then
+					local depletedPercent = 1 - percent
+					local greyHeight = buttonHeight * depletedPercent
+					if greyHeight > 1 then
+						btn.greyOverlay:ClearAllPoints()
+						btn.greyOverlay:SetPoint("TOPLEFT", btn, "TOPLEFT", 0, 0)
+						btn.greyOverlay:SetPoint("TOPRIGHT", btn, "TOPRIGHT", 0, 0)
+						btn.greyOverlay:SetHeight(greyHeight)
+						local texBottom = 0.08 + (depletedPercent * 0.84)
+						btn.greyOverlay:SetTexCoord(0.08, 0.92, 0.08, texBottom)
+						btn.greyOverlay:Show()
+					else
+						btn.greyOverlay:Hide()
+					end
+				elseif btn.greyOverlay then
+					btn.greyOverlay:Hide()
+				end
+
+				-- Time text
+				if showText and btn.timeText then
+					if remaining >= 60 then
+						btn.timeText:SetText(math.floor(remaining / 60) .. "m")
+					else
+						btn.timeText:SetText(math.floor(remaining) .. "s")
+					end
+				elseif btn.timeText then
+					btn.timeText:SetText("")
+				end
 			else
 				btn.cooldown:Clear()
 				btn.darkOverlay:Hide()
 				btn.icon:SetDesaturated(false)
+				if btn.progressBar then btn.progressBar:Hide() end
+				if btn.greyOverlay then btn.greyOverlay:Hide() end
+				if btn.timeText then btn.timeText:SetText("") end
 			end
 		end
 	end
@@ -3109,6 +3292,16 @@ function ShamanPower:RecreateCooldownBar()
 		self.weaponImbueFlyout = nil
 	end
 
+	-- Destroy existing shield button and flyout
+	if self.shieldButton then
+		self.shieldButton = nil  -- Reference only, actual button is in cooldownButtons
+	end
+	if self.shieldFlyout then
+		self.shieldFlyout:Hide()
+		self.shieldFlyout:SetParent(nil)
+		self.shieldFlyout = nil
+	end
+
 	-- Recreate it
 	self:CreateCooldownBar()
 	self:UpdateCooldownBar()
@@ -3160,6 +3353,9 @@ function ShamanPower:CreateWeaponImbueButton()
 	if not self.cooldownBar then return end
 	if InCombatLockdown() then return end
 
+	-- Check if imbues are enabled in options
+	if self.opt.cdbarShowImbues == false then return end
+
 	-- Check if player knows any weapon imbue
 	local knowsAnyImbue = false
 	for i = 1, 4 do
@@ -3201,9 +3397,57 @@ function ShamanPower:CreateWeaponImbueButton()
 	dark:Hide()
 	btn.darkOverlay = dark
 
-	-- Text overlay to show remaining time
+	-- Progress bar for main hand (outside left edge)
+	local barWidth = 3
+	local mainBar = btn:CreateTexture(nil, "OVERLAY")
+	mainBar:SetPoint("TOPRIGHT", btn, "TOPLEFT", -1, 0)  -- Outside left edge
+	mainBar:SetSize(barWidth, buttonSize)
+	mainBar:SetColorTexture(0.2, 0.8, 0.2, 0.9)  -- Green
+	mainBar:Hide()
+	btn.mainHandBar = mainBar
+
+	-- Progress bar for off hand (outside right edge)
+	local offBar = btn:CreateTexture(nil, "OVERLAY")
+	offBar:SetPoint("TOPLEFT", btn, "TOPRIGHT", 1, 0)  -- Outside right edge
+	offBar:SetSize(barWidth, buttonSize)
+	offBar:SetColorTexture(0.2, 0.8, 0.2, 0.9)  -- Green
+	offBar:Hide()
+	btn.offHandBar = offBar
+
+	-- Grey sweep overlay for single weapon (shows depleted portion from bottom)
+	local greyOverlay = btn:CreateTexture(nil, "ARTWORK", nil, 1)  -- Sublevel 1 to be above icon
+	greyOverlay:SetPoint("BOTTOMLEFT", btn, "BOTTOMLEFT", 0, 0)
+	greyOverlay:SetPoint("BOTTOMRIGHT", btn, "BOTTOMRIGHT", 0, 0)
+	greyOverlay:SetHeight(0)
+	greyOverlay:SetTexture(self.WeaponIcons[1])
+	greyOverlay:SetDesaturated(true)
+	greyOverlay:SetVertexColor(0.5, 0.5, 0.5)  -- Darken it a bit
+	greyOverlay:Hide()
+	btn.greyOverlay = greyOverlay
+
+	-- Grey sweep overlay for main hand (left half) in split display
+	local greyOverlay1 = btn:CreateTexture(nil, "ARTWORK", nil, 1)
+	greyOverlay1:SetPoint("BOTTOMLEFT", btn, "BOTTOMLEFT", 0, 0)
+	greyOverlay1:SetSize(buttonSize / 2, 0)
+	greyOverlay1:SetTexture(self.WeaponIcons[1])
+	greyOverlay1:SetDesaturated(true)
+	greyOverlay1:SetVertexColor(0.5, 0.5, 0.5)
+	greyOverlay1:Hide()
+	btn.greyOverlay1 = greyOverlay1
+
+	-- Grey sweep overlay for off hand (right half) in split display
+	local greyOverlay2 = btn:CreateTexture(nil, "ARTWORK", nil, 1)
+	greyOverlay2:SetPoint("BOTTOMRIGHT", btn, "BOTTOMRIGHT", 0, 0)
+	greyOverlay2:SetSize(buttonSize / 2, 0)
+	greyOverlay2:SetTexture(self.WeaponIcons[2])
+	greyOverlay2:SetDesaturated(true)
+	greyOverlay2:SetVertexColor(0.5, 0.5, 0.5)
+	greyOverlay2:Hide()
+	btn.greyOverlay2 = greyOverlay2
+
+	-- Time text for showing remaining duration
 	local timeText = btn:CreateFontString(nil, "OVERLAY", "NumberFontNormalSmall")
-	timeText:SetPoint("BOTTOM", btn, "BOTTOM", 0, 1)
+	timeText:SetPoint("CENTER", btn, "CENTER", 0, 0)
 	timeText:SetText("")
 	btn.timeText = timeText
 
@@ -3277,6 +3521,227 @@ function ShamanPower:CreateWeaponImbueButton()
 	self:CreateWeaponImbueFlyout()
 end
 
+-- ============================================================================
+-- Shield Flyout (for selecting between Lightning Shield and Water Shield)
+-- ============================================================================
+
+-- Create the flyout menu for shields
+function ShamanPower:CreateShieldFlyout()
+	if self.shieldFlyout then return end
+	if InCombatLockdown() then return end
+
+	local flyout = CreateFrame("Frame", "ShamanPowerShieldFlyout", UIParent, "BackdropTemplate")
+	flyout:SetBackdrop({
+		bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
+		edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+		tile = true, tileSize = 16, edgeSize = 12,
+		insets = { left = 2, right = 2, top = 2, bottom = 2 }
+	})
+	flyout:SetBackdropColor(0, 0, 0, 0.85)
+	flyout:SetBackdropBorderColor(0.3, 0.3, 0.3, 0.9)
+	flyout:SetFrameStrata("DIALOG")
+	flyout:Hide()
+
+	local buttonSize = 22
+	local padding = 4
+	local spacing = 2
+
+	-- Create buttons for each known shield
+	local buttons = {}
+	for i, shieldData in ipairs(self.ShieldSpells) do
+		local spellID, spellName = shieldData[1], shieldData[2]
+
+		-- Check if player knows this shield
+		if PlayerKnowsSpellByName(spellName) then
+			local name, _, icon = GetSpellInfo(spellName)
+
+			local btn = CreateFrame("Button", "ShamanPowerShieldFlyout" .. i, flyout, "SecureActionButtonTemplate")
+			btn:SetSize(buttonSize, buttonSize)
+			btn:RegisterForClicks("LeftButtonUp", "LeftButtonDown")
+
+			local iconTex = btn:CreateTexture(nil, "ARTWORK")
+			iconTex:SetAllPoints()
+			iconTex:SetTexture(icon)
+			iconTex:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+			btn.icon = iconTex
+
+			-- Click to cast shield
+			btn:SetAttribute("type1", "spell")
+			btn:SetAttribute("spell", spellName)
+
+			-- Update the main shield button's spell when this is clicked
+			btn:HookScript("PostClick", function(self, button)
+				if InCombatLockdown() then return end
+				local shieldBtn = ShamanPower.shieldButton
+				if shieldBtn then
+					shieldBtn:SetAttribute("spell1", spellName)
+					shieldBtn.defaultShieldSpell = spellName
+					-- Update the icon
+					local _, _, newIcon = GetSpellInfo(spellName)
+					if newIcon and shieldBtn.icon then
+						shieldBtn.icon:SetTexture(newIcon)
+					end
+				end
+				flyout:Hide()
+			end)
+
+			-- Tooltip
+			btn:SetScript("OnEnter", function(self)
+				GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+				GameTooltip:SetSpellByID(spellID)
+				GameTooltip:Show()
+			end)
+			btn:SetScript("OnLeave", function()
+				GameTooltip:Hide()
+			end)
+
+			btn.spellID = spellID
+			btn.spellName = spellName
+			table.insert(buttons, btn)
+		end
+	end
+
+	flyout.buttons = buttons
+	flyout.buttonSize = buttonSize
+	flyout.padding = padding
+	flyout.spacing = spacing
+
+	self.shieldFlyout = flyout
+end
+
+-- Show the shield flyout
+function ShamanPower:ShowShieldFlyout()
+	if not self.shieldFlyout then
+		self:CreateShieldFlyout()
+	end
+	if not self.shieldFlyout then return end
+	if InCombatLockdown() then return end
+
+	local flyout = self.shieldFlyout
+	local buttons = flyout.buttons
+	local numButtons = #buttons
+
+	if numButtons == 0 then return end
+
+	local buttonSize = flyout.buttonSize
+	local padding = flyout.padding
+	local spacing = flyout.spacing
+
+	-- Determine flyout direction based on layout (same as totem flyouts)
+	local isHorizontalBar = (self.opt.layout == "Horizontal")
+	local isVerticalLeft = (self.opt.layout == "VerticalLeft")
+
+	-- Hide all buttons first
+	for _, btn in ipairs(buttons) do
+		btn:Hide()
+	end
+
+	if isHorizontalBar then
+		-- Horizontal bar: flyout goes VERTICAL (down preferably)
+		local height = (buttonSize * numButtons) + (spacing * (numButtons - 1)) + (padding * 2)
+		flyout:SetSize(buttonSize + padding * 2, height)
+
+		for i, btn in ipairs(buttons) do
+			btn:ClearAllPoints()
+			btn:SetPoint("TOP", flyout, "TOP", 0, -padding - (i - 1) * (buttonSize + spacing))
+			btn:Show()
+		end
+	else
+		-- Vertical bar: flyout goes HORIZONTAL
+		local width = (buttonSize * numButtons) + (spacing * (numButtons - 1)) + (padding * 2)
+		flyout:SetSize(width, buttonSize + padding * 2)
+
+		for i, btn in ipairs(buttons) do
+			btn:ClearAllPoints()
+			btn:SetPoint("LEFT", flyout, "LEFT", padding + (i - 1) * (buttonSize + spacing), 0)
+			btn:Show()
+		end
+	end
+
+	-- Position flyout relative to shield button
+	self:PositionShieldFlyout(flyout, self.shieldButton)
+
+	flyout:Show()
+
+	-- Auto-hide after a delay if mouse leaves
+	flyout:SetScript("OnLeave", function(self)
+		C_Timer.After(0.3, function()
+			if not self:IsMouseOver() and not ShamanPower.shieldButton:IsMouseOver() then
+				self:Hide()
+			end
+		end)
+	end)
+end
+
+-- Position the shield flyout (same direction as totem flyouts)
+function ShamanPower:PositionShieldFlyout(flyout, shieldButton)
+	if not flyout or not shieldButton then return end
+
+	local isHorizontalBar = (self.opt.layout == "Horizontal")
+	local isVerticalLeft = (self.opt.layout == "VerticalLeft")
+
+	-- Match scale
+	local parentScale = shieldButton:GetEffectiveScale() / UIParent:GetEffectiveScale()
+	flyout:SetScale(parentScale)
+
+	local screenWidth = GetScreenWidth()
+	local screenHeight = GetScreenHeight()
+
+	local buttonLeft = shieldButton:GetLeft() or 0
+	local buttonRight = shieldButton:GetRight() or 0
+	local buttonTop = shieldButton:GetTop() or 0
+	local buttonBottom = shieldButton:GetBottom() or 0
+
+	local flyoutWidth = flyout:GetWidth() * parentScale
+	local flyoutHeight = flyout:GetHeight() * parentScale
+
+	flyout:ClearAllPoints()
+
+	if isHorizontalBar then
+		-- Horizontal bar: flyout goes VERTICAL (down preferably, up if no space)
+		local spaceAbove = screenHeight - buttonTop
+		local spaceBelow = buttonBottom
+
+		if spaceBelow >= flyoutHeight + 2 then
+			flyout:SetPoint("TOP", shieldButton, "BOTTOM", 0, -2)
+		elseif spaceAbove >= flyoutHeight + 2 then
+			flyout:SetPoint("BOTTOM", shieldButton, "TOP", 0, 2)
+		elseif spaceBelow >= spaceAbove then
+			flyout:SetPoint("TOP", shieldButton, "BOTTOM", 0, -2)
+		else
+			flyout:SetPoint("BOTTOM", shieldButton, "TOP", 0, 2)
+		end
+	else
+		-- Vertical bar: flyout goes HORIZONTAL (left/right based on layout)
+		local spaceRight = screenWidth - buttonRight
+		local spaceLeft = buttonLeft
+
+		if isVerticalLeft then
+			-- VerticalLeft: prefer flyout to the RIGHT
+			if spaceRight >= flyoutWidth + 2 then
+				flyout:SetPoint("LEFT", shieldButton, "RIGHT", 2, 0)
+			elseif spaceLeft >= flyoutWidth + 2 then
+				flyout:SetPoint("RIGHT", shieldButton, "LEFT", -2, 0)
+			elseif spaceRight >= spaceLeft then
+				flyout:SetPoint("LEFT", shieldButton, "RIGHT", 2, 0)
+			else
+				flyout:SetPoint("RIGHT", shieldButton, "LEFT", -2, 0)
+			end
+		else
+			-- Vertical (Right): prefer flyout to the LEFT
+			if spaceLeft >= flyoutWidth + 2 then
+				flyout:SetPoint("RIGHT", shieldButton, "LEFT", -2, 0)
+			elseif spaceRight >= flyoutWidth + 2 then
+				flyout:SetPoint("LEFT", shieldButton, "RIGHT", 2, 0)
+			elseif spaceLeft >= spaceRight then
+				flyout:SetPoint("RIGHT", shieldButton, "LEFT", -2, 0)
+			else
+				flyout:SetPoint("LEFT", shieldButton, "RIGHT", 2, 0)
+			end
+		end
+	end
+end
+
 -- Create the flyout menu for weapon imbues
 function ShamanPower:CreateWeaponImbueFlyout()
 	if self.weaponImbueFlyout then return end
@@ -3348,65 +3813,6 @@ function ShamanPower:CreateWeaponImbueFlyout()
 			btn.imbueIndex = imbueIndex
 			btn.spellName = spellName
 			table.insert(buttons, btn)
-		end
-	end
-
-	-- Add combined imbue buttons if player can dual wield
-	if self:CanDualWield() then
-		for i, combo in ipairs(self.CombinedImbues) do
-			local mainSpell = self:GetHighestRankImbue(combo.main)
-			local offSpell = self:GetHighestRankImbue(combo.off)
-
-			if mainSpell and offSpell then
-				local btn = CreateFrame("Button", "ShamanPowerImbueCombo" .. i, flyout, "SecureActionButtonTemplate")
-				btn:SetSize(buttonSize, buttonSize)
-				btn:RegisterForClicks("LeftButtonUp")
-
-				-- Combined buttons use macro to cast both
-				btn:SetAttribute("type1", "macro")
-				btn:SetAttribute("macrotext1", "/cast " .. mainSpell .. "\n/use 16\n/click StaticPopup1Button1\n/cast " .. offSpell .. "\n/use 17\n/click StaticPopup1Button1")
-
-				-- Split icon display
-				local icon1 = btn:CreateTexture(nil, "ARTWORK")
-				icon1:SetPoint("TOPLEFT", btn, "TOPLEFT", 0, 0)
-				icon1:SetPoint("BOTTOMRIGHT", btn, "CENTER", 0, 0)
-				icon1:SetTexture(self.WeaponIcons[combo.main])
-				icon1:SetTexCoord(0.08, 0.5, 0.08, 0.5)
-				btn.icon = icon1
-
-				local icon2 = btn:CreateTexture(nil, "ARTWORK")
-				icon2:SetPoint("TOPLEFT", btn, "CENTER", 0, 0)
-				icon2:SetPoint("BOTTOMRIGHT", btn, "BOTTOMRIGHT", 0, 0)
-				icon2:SetTexture(self.WeaponIcons[combo.off])
-				icon2:SetTexCoord(0.5, 0.92, 0.5, 0.92)
-				btn.icon2 = icon2
-
-				-- Highlight
-				local highlight = btn:CreateTexture(nil, "HIGHLIGHT")
-				highlight:SetAllPoints()
-				highlight:SetColorTexture(1, 1, 1, 0.3)
-
-				-- Tooltip
-				btn:SetScript("OnEnter", function(self)
-					GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-					GameTooltip:SetText(combo.name)
-					GameTooltip:AddLine("Applies " .. ShamanPower.WeaponEnchantNames[combo.main] .. " to Main Hand")
-					GameTooltip:AddLine("Applies " .. ShamanPower.WeaponEnchantNames[combo.off] .. " to Off Hand")
-					GameTooltip:Show()
-				end)
-				btn:SetScript("OnLeave", function() GameTooltip:Hide() end)
-
-				-- Hide flyout after click
-				btn:SetScript("PostClick", function()
-					flyout:Hide()
-					ShamanPower.lastMainHandImbue = combo.main
-					ShamanPower.lastOffHandImbue = combo.off
-				end)
-
-				btn.isCombo = true
-				btn.combo = combo
-				table.insert(buttons, btn)
-			end
 		end
 	end
 
@@ -3553,6 +3959,13 @@ function ShamanPower:UpdateWeaponImbueButton()
 	if not btn then return end
 
 	local hasMain, mainExp, _, mainID, hasOff, offExp, _, offID = GetWeaponEnchantInfo()
+	local maxDuration = 1800000  -- 30 minutes in milliseconds
+	local buttonHeight = btn:GetHeight()
+
+	-- Get display options
+	local showBars = self.opt.cdbarShowProgressBars ~= false
+	local showSweep = self.opt.cdbarShowColorSweep ~= false
+	local showText = self.opt.cdbarShowCDText ~= false
 
 	if hasMain then
 		local imbueType = self.EnchantIDToImbue[mainID] or 1
@@ -3560,38 +3973,128 @@ function ShamanPower:UpdateWeaponImbueButton()
 		btn.icon:SetDesaturated(false)
 		btn.darkOverlay:Hide()
 
-		-- Show time remaining
-		local mins = math.floor(mainExp / 60000)
-		if mins < 5 then
-			btn.timeText:SetTextColor(1, 0.3, 0.3)  -- Red when low
+		local mainPercent = math.min(mainExp / maxDuration, 1)
+
+		-- Update main hand progress bar (outside left edge)
+		if showBars then
+			local mainBarHeight = math.max(buttonHeight * mainPercent, 1)
+			btn.mainHandBar:SetHeight(mainBarHeight)
+			btn.mainHandBar:ClearAllPoints()
+			btn.mainHandBar:SetPoint("BOTTOMRIGHT", btn, "BOTTOMLEFT", -1, 0)
+			local r, g, b = GetTimerBarColor(mainExp)
+			btn.mainHandBar:SetColorTexture(r, g, b, 0.9)
+			btn.mainHandBar:Show()
 		else
-			btn.timeText:SetTextColor(1, 1, 1)
+			btn.mainHandBar:Hide()
 		end
-		btn.timeText:SetText(mins .. "m")
+
+		-- Update time text (show main hand time)
+		if showText then
+			local mins = math.floor(mainExp / 60000)
+			btn.timeText:SetText(mins .. "m")
+			btn.timeText:Show()
+		else
+			btn.timeText:SetText("")
+			btn.timeText:Hide()
+		end
 
 		-- If dual wielding, show split display (left half = main hand, right half = off hand)
 		if self:CanDualWield() and hasOff then
 			local offImbueType = self.EnchantIDToImbue[offID] or 2
+			local offPercent = math.min(offExp / maxDuration, 1)
 
-			-- Main hand icon - left half of button, showing left half of texture
+			-- Main hand icon - left half of button (full height), showing left half of texture
 			btn.icon:ClearAllPoints()
 			btn.icon:SetPoint("TOPLEFT", btn, "TOPLEFT", 0, 0)
-			btn.icon:SetPoint("BOTTOMRIGHT", btn, "CENTER", 0, 0)
-			btn.icon:SetTexCoord(0.08, 0.5, 0.08, 0.92)  -- Left half of icon
+			btn.icon:SetPoint("BOTTOMRIGHT", btn, "BOTTOM", 0, 0)
+			btn.icon:SetTexCoord(0.08, 0.5, 0.08, 0.92)
 
-			-- Off hand icon - right half of button, showing right half of texture
+			-- Off hand icon - right half of button (full height), showing right half of texture
 			btn.icon2:ClearAllPoints()
-			btn.icon2:SetPoint("TOPLEFT", btn, "CENTER", 0, 0)
+			btn.icon2:SetPoint("TOPLEFT", btn, "TOP", 0, 0)
 			btn.icon2:SetPoint("BOTTOMRIGHT", btn, "BOTTOMRIGHT", 0, 0)
 			btn.icon2:SetTexture(self.WeaponIcons[offImbueType])
-			btn.icon2:SetTexCoord(0.5, 0.92, 0.08, 0.92)  -- Right half of icon
+			btn.icon2:SetTexCoord(0.5, 0.92, 0.08, 0.92)
 			btn.icon2:Show()
+
+			-- Update off hand progress bar (outside right edge)
+			if showBars then
+				local offBarHeight = math.max(buttonHeight * offPercent, 1)
+				btn.offHandBar:SetHeight(offBarHeight)
+				btn.offHandBar:ClearAllPoints()
+				btn.offHandBar:SetPoint("BOTTOMLEFT", btn, "BOTTOMRIGHT", 1, 0)
+				local r2, g2, b2 = GetTimerBarColor(offExp)
+				btn.offHandBar:SetColorTexture(r2, g2, b2, 0.9)
+				btn.offHandBar:Show()
+			else
+				btn.offHandBar:Hide()
+			end
+
+			-- Grey sweep overlays for split display (depleted portion from top)
+			if showSweep then
+				local mainDepletedPercent = 1 - mainPercent
+				local mainGreyHeight = buttonHeight * mainDepletedPercent
+				if mainGreyHeight > 1 then
+					btn.greyOverlay1:SetTexture(self.WeaponIcons[imbueType])
+					btn.greyOverlay1:ClearAllPoints()
+					btn.greyOverlay1:SetPoint("TOPLEFT", btn, "TOPLEFT", 0, 0)
+					btn.greyOverlay1:SetSize(buttonHeight / 2, mainGreyHeight)
+					local texBottom = 0.08 + (mainDepletedPercent * 0.84)
+					btn.greyOverlay1:SetTexCoord(0.08, 0.5, 0.08, texBottom)
+					btn.greyOverlay1:Show()
+				else
+					btn.greyOverlay1:Hide()
+				end
+
+				local offDepletedPercent = 1 - offPercent
+				local offGreyHeight = buttonHeight * offDepletedPercent
+				if offGreyHeight > 1 then
+					btn.greyOverlay2:SetTexture(self.WeaponIcons[offImbueType])
+					btn.greyOverlay2:ClearAllPoints()
+					btn.greyOverlay2:SetPoint("TOPRIGHT", btn, "TOPRIGHT", 0, 0)
+					btn.greyOverlay2:SetSize(buttonHeight / 2, offGreyHeight)
+					local texBottom = 0.08 + (offDepletedPercent * 0.84)
+					btn.greyOverlay2:SetTexCoord(0.5, 0.92, 0.08, texBottom)
+					btn.greyOverlay2:Show()
+				else
+					btn.greyOverlay2:Hide()
+				end
+			else
+				btn.greyOverlay1:Hide()
+				btn.greyOverlay2:Hide()
+			end
+
+			btn.greyOverlay:Hide()
 		else
 			-- Single weapon display
 			btn.icon:ClearAllPoints()
 			btn.icon:SetAllPoints()
 			btn.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
 			btn.icon2:Hide()
+			btn.offHandBar:Hide()
+
+			-- Grey sweep overlay for single display (depleted portion from top)
+			if showSweep then
+				local depletedPercent = 1 - mainPercent
+				local greyHeight = buttonHeight * depletedPercent
+				if greyHeight > 1 then
+					btn.greyOverlay:SetTexture(self.WeaponIcons[imbueType])
+					btn.greyOverlay:ClearAllPoints()
+					btn.greyOverlay:SetPoint("TOPLEFT", btn, "TOPLEFT", 0, 0)
+					btn.greyOverlay:SetPoint("TOPRIGHT", btn, "TOPRIGHT", 0, 0)
+					btn.greyOverlay:SetHeight(greyHeight)
+					local texBottom = 0.08 + (depletedPercent * 0.84)
+					btn.greyOverlay:SetTexCoord(0.08, 0.92, 0.08, texBottom)
+					btn.greyOverlay:Show()
+				else
+					btn.greyOverlay:Hide()
+				end
+			else
+				btn.greyOverlay:Hide()
+			end
+
+			btn.greyOverlay1:Hide()
+			btn.greyOverlay2:Hide()
 		end
 	else
 		-- No enchant - show default icon desaturated
@@ -3600,7 +4103,12 @@ function ShamanPower:UpdateWeaponImbueButton()
 		btn.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
 		btn.icon:SetDesaturated(true)
 		btn.icon2:Hide()
+		btn.mainHandBar:Hide()
+		btn.offHandBar:Hide()
 		btn.darkOverlay:Show()
+		btn.greyOverlay:Hide()
+		btn.greyOverlay1:Hide()
+		btn.greyOverlay2:Hide()
 		btn.timeText:SetText("")
 	end
 end
