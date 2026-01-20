@@ -146,92 +146,12 @@ ShamanPower.options = {
 				-- settings_buffs removed - was PallyPower blessing options not applicable to Shamans
 				settings_frames = {
 					order = 3,
-					name = "Layout & Reset",
+					name = "Reset",
 					type = "group",
 					inline = true,
 					args = {
-						layout = {
-							order = 1,
-							type = "select",
-							width = 1.4,
-							name = L["Buff Button | Player Button Layout"],
-							desc = L["LAYOUT_TOOLTIP"],
-							disabled = function(info)
-								return ShamanPower.opt.enabled == false or not isShaman
-							end,
-							get = function(info)
-								return ShamanPower.opt.layout
-							end,
-							set = function(info, val)
-								-- Don't change layout in combat
-								if InCombatLockdown() then return end
-
-								-- Save current autoButton screen position before layout change
-								local oldLayout = ShamanPower.opt.layout
-								local autoBtn = ShamanPower.autoButton
-								local header = ShamanPower.Header
-								local oldCenterX, oldCenterY
-								if autoBtn and autoBtn:IsShown() then
-									oldCenterX, oldCenterY = autoBtn:GetCenter()
-								end
-
-								-- Change the layout
-								ShamanPower.opt.layout = val
-								ShamanPower:UpdateLayout()
-								ShamanPower:UpdateRoster()
-
-								-- Restore position so autoButton stays in same screen location
-								if oldCenterX and oldCenterY and autoBtn and header then
-									local newCenterX, newCenterY = autoBtn:GetCenter()
-									if newCenterX and newCenterY then
-										-- Calculate the offset needed
-										local deltaX = oldCenterX - newCenterX
-										local deltaY = oldCenterY - newCenterY
-
-										-- Move the main frame to compensate
-										local frame = _G["ShamanPowerFrame"]
-										if frame and not InCombatLockdown() then
-											local point, relativeTo, relativePoint, xOfs, yOfs = frame:GetPoint()
-											if point and xOfs and yOfs then
-												frame:ClearAllPoints()
-												frame:SetPoint(point, relativeTo, relativePoint, xOfs + deltaX, yOfs + deltaY)
-											end
-										end
-									end
-								end
-
-								-- Update cooldown bar position for new layout
-								ShamanPower:UpdateCooldownBar()
-							end,
-							values = {
-								["Horizontal"] = "Horizontal",
-								["Vertical"] = "Vertical (Right)",
-								["VerticalLeft"] = "Vertical (Left)",
-							}
-						},
-						assignmentsscale = {
-							order = 2,
-							name = L["Totem Assignments Scale"],
-							desc = L["This allows you to adjust the overall size of the Totem Assignments Panel"],
-							type = "range",
-							width = 1.5,
-							min = 0.4,
-							max = 1.5,
-							step = 0.05,
-							disabled = function(info)
-								return ShamanPower.opt.enabled == false or not isShaman
-							end,
-							get = function(info)
-								return ShamanPower.opt.configscale
-							end,
-							set = function(info, val)
-								ShamanPower.opt.configscale = val
-								ShamanPower:UpdateLayout()
-								ShamanPower:UpdateRoster()
-							end
-						},
 						reset = {
-							order = 3,
+							order = 1,
 							name = L["Reset Frames"],
 							desc = L["Reset all ShamanPower frames back to center"],
 							type = "execute",
@@ -1296,6 +1216,73 @@ ShamanPower.options = {
 					name = "|cffffd200Fluffy Settings|r\nUI customization options - dedicated to FluffyKable from the Shaman Discord.\n",
 					fontSize = "medium",
 				},
+				layout_section = {
+					order = 0.5,
+					name = "Layout",
+					type = "group",
+					inline = true,
+					args = {
+						layout = {
+							order = 1,
+							type = "select",
+							width = 1.4,
+							name = L["Buff Button | Player Button Layout"],
+							desc = L["LAYOUT_TOOLTIP"],
+							disabled = function(info)
+								return ShamanPower.opt.enabled == false or not isShaman
+							end,
+							get = function(info)
+								return ShamanPower.opt.layout
+							end,
+							set = function(info, val)
+								-- Don't change layout in combat
+								if InCombatLockdown() then return end
+
+								-- Save current autoButton screen position before layout change
+								local oldLayout = ShamanPower.opt.layout
+								local autoBtn = ShamanPower.autoButton
+								local header = ShamanPower.Header
+								local oldCenterX, oldCenterY
+								if autoBtn and autoBtn:IsShown() then
+									oldCenterX, oldCenterY = autoBtn:GetCenter()
+								end
+
+								-- Change the layout
+								ShamanPower.opt.layout = val
+								ShamanPower:UpdateLayout()
+								ShamanPower:UpdateRoster()
+
+								-- Restore position so autoButton stays in same screen location
+								if oldCenterX and oldCenterY and autoBtn and header then
+									local newCenterX, newCenterY = autoBtn:GetCenter()
+									if newCenterX and newCenterY then
+										-- Calculate the offset needed
+										local deltaX = oldCenterX - newCenterX
+										local deltaY = oldCenterY - newCenterY
+
+										-- Move the main frame to compensate
+										local frame = _G["ShamanPowerFrame"]
+										if frame and not InCombatLockdown() then
+											local point, relativeTo, relativePoint, xOfs, yOfs = frame:GetPoint()
+											if point and xOfs and yOfs then
+												frame:ClearAllPoints()
+												frame:SetPoint(point, relativeTo, relativePoint, xOfs + deltaX, yOfs + deltaY)
+											end
+										end
+									end
+								end
+
+								-- Update cooldown bar position for new layout
+								ShamanPower:UpdateCooldownBar()
+							end,
+							values = {
+								["Horizontal"] = "Horizontal",
+								["Vertical"] = "Vertical (Right)",
+								["VerticalLeft"] = "Vertical (Left)",
+							}
+						},
+					}
+				},
 				scale_section = {
 					order = 1,
 					name = "Scale",
@@ -1342,6 +1329,27 @@ ShamanPower.options = {
 							set = function(info, val)
 								ShamanPower.opt.cooldownBarScale = val
 								ShamanPower:UpdateCooldownBarScale()
+							end
+						},
+						assignmentsscale = {
+							order = 3,
+							name = L["Totem Assignments Scale"],
+							desc = L["This allows you to adjust the overall size of the Totem Assignments Panel"],
+							type = "range",
+							width = 1.5,
+							min = 0.4,
+							max = 1.5,
+							step = 0.05,
+							disabled = function(info)
+								return ShamanPower.opt.enabled == false or not isShaman
+							end,
+							get = function(info)
+								return ShamanPower.opt.configscale
+							end,
+							set = function(info, val)
+								ShamanPower.opt.configscale = val
+								ShamanPower:UpdateLayout()
+								ShamanPower:UpdateRoster()
 							end
 						},
 					}
