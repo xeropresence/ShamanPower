@@ -10,6 +10,9 @@
 - Add option to show keybind text on buttons (top-right corner)
 - Auto-update cooldown bar when changing talents/specs
 - Add "Exclude from Drop All" toggles to skip specific totem types (Earth, Fire, Water, Air)
+- Add "Fluffy Settings" tab for UI customization (dedicated to FluffyKable)
+- Add Button Padding sliders for Totem Bar and Cooldown Bar spacing
+- Reorganize options: move UI settings from Settings/Buttons tabs to Fluffy Settings
 
 ## [v1.3.1](https://github.com/taubut/ShamanPower/releases/tag/v1.3.1) (2026-01-19)
 - Add cooldown bar order customization (drag to reorder Shield, Recall, Ankh, NS, MTT, BL, Imbue)
