@@ -3298,7 +3298,7 @@ function ShamanPower:CreateWeaponImbueFlyout()
 	flyout:SetBackdropBorderColor(0.6, 0.4, 0.8, 1)  -- Purple for Enhancement
 
 	local buttons = {}
-	local buttonSize = 28
+	local buttonSize = 22  -- Match cooldown bar icon size
 	local padding = 4
 	local spacing = 2
 
