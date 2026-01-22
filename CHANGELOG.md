@@ -1,6 +1,6 @@
 # ShamanPower Changelog
 
-## [v1.3.7-beta](https://github.com/taubut/ShamanPower/releases/tag/v1.3.7-beta) (2026-01-22)
+## [v1.3.7](https://github.com/taubut/ShamanPower/releases/tag/v1.3.7) (2026-01-22)
 
 ### Pop-Out Individual Trackers
 - Middle-click any button to pop it out as a standalone, movable tracker
