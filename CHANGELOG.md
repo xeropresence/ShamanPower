@@ -30,6 +30,7 @@
 - Fix cooldown bar hidden items still working with keybinds (buttons created but hidden)
 - Fix Earth Shield tracker crash when leaving group (nil table error)
 - Fix various option label abbreviations (Horiz/Vert changed to Horizontal/Vertical)
+- Fix Windfury Totem range indicator on mini totem bar (now uses same broadcast system as SPRange)
 
 ## [v1.3.6](https://github.com/taubut/ShamanPower/releases/tag/v1.3.6) (2026-01-21)
 - Fix profile system: Totem bar and cooldown bar positions now properly save and restore per-profile

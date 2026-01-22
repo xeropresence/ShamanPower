@@ -2119,7 +2119,7 @@ ShamanPower.TotemBuffNames = {
 		-- Poison/Disease cleansing don't have visible buffs
 	},
 	[4] = {  -- Air
-		-- [1] = Windfury Totem - NO visible buff, gives melee proc chance
+		-- [1] = Windfury Totem - uses broadcast system since we can't check other players' buffs
 		[2] = "Grace of Air",
 		[3] = "Wrath of Air",
 		[4] = "Tranquil Air",
@@ -2329,8 +2329,8 @@ function ShamanPower:UpdatePartyRangeDots()
 						local hasBuff = buffName and self:UnitHasBuff(unit, buffName)
 
 						-- Special case: Air element (4) with no buffName = Windfury Totem
-						-- Windfury doesn't give a visible buff, only a weapon enchant
-						-- Use reported weapon enchant data from other players
+						-- We can't check other players' buffs with UnitBuff, so use
+						-- the broadcast system where each player reports their own buff status
 						local isWindfury = (element == 4 and not buffName)
 						if isWindfury then
 							local playerName = UnitName(unit)
@@ -15333,20 +15333,34 @@ function ShamanPower:ToggleSPRange()
 	end
 end
 
--- Broadcast Windfury weapon enchant status to group
+-- Broadcast Windfury Totem status to group (same detection as SPRange)
+-- NOTE: This sends directly via ChatThrottleLib to bypass the lastMsg check in SendMessage
+-- which would block repeated "WFBUFF 1" messages. We need periodic broadcasts so the shaman
+-- knows party members are still in range.
 function ShamanPower:BroadcastWindfuryStatus()
 	if not IsInGroup() then return end
 
+	-- Use SAME detection as SPRange - check weapon enchant from GetWeaponEnchantInfo()
 	local hasWindfury = self:SPRangeHasWindfuryWeapon()
 	local status = hasWindfury and "1" or "0"
 
-	-- Only send if status changed or every 5 seconds
-	if self.lastWFStatus ~= status or not self.lastWFBroadcast or (GetTime() - self.lastWFBroadcast) > 5 then
+	-- Send every 2 seconds or when status changes
+	if self.lastWFStatus ~= status or not self.lastWFBroadcast or (GetTime() - self.lastWFBroadcast) > 2 then
 		self.lastWFStatus = status
 		self.lastWFBroadcast = GetTime()
 
-		local channel = IsInRaid() and "RAID" or "PARTY"
-		self:SendMessage("WFBUFF " .. status, channel)
+		-- Determine channel
+		local channel
+		if IsInGroup(LE_PARTY_CATEGORY_INSTANCE) and IsInInstance() then
+			channel = "INSTANCE_CHAT"
+		elseif IsInRaid() then
+			channel = "RAID"
+		else
+			channel = "PARTY"
+		end
+
+		-- Send directly via ChatThrottleLib (bypass lastMsg check in SendMessage)
+		ChatThrottleLib:SendAddonMessage("NORMAL", self.commPrefix, "WFBUFF " .. status, channel)
 	end
 end
 
