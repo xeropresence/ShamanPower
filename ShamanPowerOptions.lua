@@ -2464,6 +2464,55 @@ ShamanPower.options = {
 						},
 					}
 				},
+				popout_section = {
+					order = 13,
+					name = "Pop-Out Trackers",
+					type = "group",
+					inline = true,
+					args = {
+						popout_desc = {
+							order = 0,
+							type = "description",
+							name = "Middle-click any totem or cooldown button to pop it out into a standalone, movable tracker. Use the cog wheel on each pop-out for individual settings (scale, opacity, hide frame). Middle-click or use the cog menu to return to bar. ALT+drag to move when frame is hidden.",
+						},
+						popout_return_all = {
+							order = 1,
+							type = "execute",
+							name = "Return All to Bars",
+							desc = "Return all popped-out trackers back to their original bars",
+							width = 1.2,
+							func = function()
+								if InCombatLockdown() then
+									print("|cffff0000ShamanPower:|r Cannot modify pop-outs during combat")
+									return
+								end
+								ShamanPower:ReturnAllPopOutsToBar()
+							end,
+						},
+						popout_hide_all_frames = {
+							order = 2,
+							type = "toggle",
+							name = "Hide All Frames",
+							desc = "Hide the frame/border around all popped-out trackers (show only icons). You can still use ALT+drag to move them.",
+							width = 1.2,
+							get = function(info)
+								return ShamanPower.opt.poppedOutHideAllFrames or false
+							end,
+							set = function(info, val)
+								ShamanPower.opt.poppedOutHideAllFrames = val
+								-- Apply to all existing pop-outs
+								for key, frame in pairs(ShamanPower.poppedOutFrames) do
+									ShamanPower.opt.poppedOutSettings = ShamanPower.opt.poppedOutSettings or {}
+									ShamanPower.opt.poppedOutSettings[key] = ShamanPower.opt.poppedOutSettings[key] or {}
+									local wasHidden = ShamanPower.opt.poppedOutSettings[key].hideFrame
+									if val ~= wasHidden then
+										ShamanPower:TogglePopOutFrame(key)
+									end
+								end
+							end,
+						},
+					}
+				},
 			}
 		},
 		raids = {

@@ -140,6 +140,15 @@ SHAMANPOWER_DEFAULT_VALUES = {
         totemBarShowAir = true,    -- Show Air totem button on mini bar
         totemBarShowEarthShield = true,  -- Show Earth Shield button on mini bar
         cooldownBarOrder = {1, 2, 3, 4, 5, 6, 7},  -- Order of cooldown bar items: 1=Shield, 2=Recall, 3=Ankh, 4=NS, 5=ManaTide, 6=BL/Hero, 7=Imbues
+        -- Pop-out tracker settings
+        -- Keys: "totem_earth", "totem_fire", "totem_water", "totem_air" (element with flyout)
+        --       "single_1_3" (element 1, totem index 3 = Tremor Totem)
+        --       "cd_1", "cd_2", etc. (cooldown bar items by type)
+        poppedOut = {},  -- Values: true if popped out
+        poppedOutPositions = {},  -- Values: {point="CENTER", relPoint="CENTER", x=0, y=0}
+        poppedOutSettings = {},  -- Values: {scale=1.0, opacity=1.0}
+        poppedOutDefaultScale = 1.0,  -- Default scale for new pop-outs
+        poppedOutDefaultOpacity = 1.0,  -- Default opacity for new pop-outs
         skin = "Smooth",
         SmartBuffs = true,
         syncToTotemTimers = false,  -- Sync assignments to TotemTimers addon (if installed)

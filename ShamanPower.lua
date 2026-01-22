@@ -370,6 +370,28 @@ function ShamanPower:OnDisable()
 end
 
 function ShamanPower:OnProfileChanged()
+	-- Clean up all popped-out frames from the old profile first
+	if self.poppedOutFrames then
+		for key, frame in pairs(self.poppedOutFrames) do
+			if frame then
+				-- Reparent buttons back before hiding frame
+				if frame.totemButton then
+					frame.totemButton:SetParent(UIParent)
+				end
+				if frame.cooldownButton and self.cooldownBar then
+					frame.cooldownButton:SetParent(self.cooldownBar)
+				end
+				if frame.button then
+					frame.button:Hide()
+					frame.button:SetParent(nil)
+				end
+				frame:Hide()
+				frame:SetParent(nil)
+			end
+		end
+		wipe(self.poppedOutFrames)
+	end
+
 	self.opt = self.db.profile
 
 	-- Reset frame positions when profile changes (prevents off-screen issues)
@@ -409,6 +431,11 @@ function ShamanPower:OnProfileChanged()
 	self:UpdateLayout()
 	self:UpdateRoster()
 	self:ApplyAllOpacity()
+
+	-- Restore popped-out trackers from the new profile
+	C_Timer.After(0.5, function()
+		self:RestorePoppedOutTrackers()
+	end)
 	--self:Debug("Profile changed, positions restored from profile.")
 end
 
@@ -1702,12 +1729,102 @@ function ShamanPower:SetupPulseOverlays()
 			-- Check Earth totem (slot 2)
 			local earthData, earthStart = ShamanPower:GetActivePulsingTotem(2)
 			ShamanPower:UpdatePulseGlow(1, earthData, earthStart)
+			ShamanPower:UpdatePoppedOutPulse(1, 2, earthData, earthStart)  -- element 1, slot 2
 
 			-- Check Water totem (slot 3)
 			local waterData, waterStart = ShamanPower:GetActivePulsingTotem(3)
 			ShamanPower:UpdatePulseGlow(3, waterData, waterStart)
+			ShamanPower:UpdatePoppedOutPulse(3, 3, waterData, waterStart)  -- element 3, slot 3
 		end)
 		self.pulseFrame:Show()
+	end
+end
+
+-- Update pulse effects on popped-out single totems
+function ShamanPower:UpdatePoppedOutPulse(element, slot, totemData, startTime)
+	-- Get the active totem name to match against pop-outs
+	local haveTotem, activeTotemName = GetTotemInfo(slot)
+
+	-- Iterate through all popped-out overlays for this element
+	for key, overlay in pairs(self.poppedOutOverlays or {}) do
+		if overlay.element == element then
+			local frame = self.poppedOutFrames[key]
+			local matchesTotem = false
+
+			-- Check if this pop-out's totem matches the active totem
+			if haveTotem and activeTotemName and overlay.spellName then
+				-- Try matching spell names
+				local ok1, result1 = pcall(string.find, activeTotemName, overlay.spellName, 1, true)
+				local ok2, result2 = pcall(string.find, overlay.spellName, activeTotemName, 1, true)
+				if (ok1 and result1) or (ok2 and result2) then
+					matchesTotem = true
+				end
+			end
+
+			if matchesTotem and totemData and startTime then
+				-- This pop-out matches the active pulsing totem - show pulse
+				local now = GetTime()
+				local totemAge = now - startTime
+				local pulseInterval = totemData.interval
+				local cyclePos = (totemAge % pulseInterval) / pulseInterval
+				local timeRemaining = pulseInterval * (1 - cyclePos)
+
+				-- Update wipe bar
+				if overlay.UpdateWipe then
+					overlay:UpdateWipe(cyclePos)
+				end
+
+				-- Update time display
+				local displayOption = self.opt.pulseTimeDisplay or "none"
+				if overlay.UpdateTime then
+					overlay:UpdateTime(timeRemaining, displayOption)
+				end
+
+				-- Update glow flash (pulse at start of cycle)
+				local alpha
+				if cyclePos < 0.15 then
+					alpha = 1 - (cyclePos / 0.15)
+				else
+					alpha = 0
+				end
+
+				if alpha > 0 then
+					overlay:SetAlpha(alpha * 0.9)
+					overlay:Show()
+				else
+					overlay:SetAlpha(0)
+					overlay:Hide()
+				end
+
+				-- Show active border on the frame
+				if frame and frame.activeBorder then
+					frame.activeBorder:Show()
+				end
+			else
+				-- No match or no active pulsing totem - hide pulse
+				overlay:SetAlpha(0)
+				overlay:Hide()
+				if overlay.HideWipe then
+					overlay:HideWipe()
+				end
+				if overlay.HideTime then
+					overlay:HideTime()
+				end
+
+				-- Check if this pop-out's totem is active (but not pulsing)
+				if matchesTotem and haveTotem then
+					-- Totem is active but not pulsing - just show active border
+					if frame and frame.activeBorder then
+						frame.activeBorder:Show()
+					end
+				else
+					-- Hide active border
+					if frame and frame.activeBorder then
+						frame.activeBorder:Hide()
+					end
+				end
+			end
+		end
 	end
 end
 
@@ -1718,6 +1835,37 @@ function ShamanPower:UpdatePulseGlow(element, totemData, startTime)
 	-- Check if active overlay is showing for this element
 	local activeOverlay = self.activeTotemOverlays and self.activeTotemOverlays[element]
 	local useOverlay = activeOverlay and activeOverlay.isActive
+
+	-- Check if the active totem is popped out - if so, don't show pulse on main bar
+	local totemIsPoppedOut = false
+	if totemData then
+		local slot = self.ElementToSlot and self.ElementToSlot[element] or element
+		local haveTotem, activeTotemName = GetTotemInfo(slot)
+		if haveTotem and activeTotemName then
+			-- Check if any popped-out single totem matches
+			for key, overlay in pairs(self.poppedOutOverlays or {}) do
+				if overlay.element == element and overlay.spellName then
+					local ok1, result1 = pcall(string.find, activeTotemName, overlay.spellName, 1, true)
+					local ok2, result2 = pcall(string.find, overlay.spellName, activeTotemName, 1, true)
+					if (ok1 and result1) or (ok2 and result2) then
+						totemIsPoppedOut = true
+						break
+					end
+				end
+			end
+		end
+	end
+
+	-- If totem is popped out, hide main bar pulse and let UpdatePoppedOutPulse handle it
+	if totemIsPoppedOut then
+		glow:SetAlpha(0)
+		glow:Hide()
+		glow:HideWipe()
+		if glow.HideTime then
+			glow:HideTime()
+		end
+		return
+	end
 
 	if totemData and startTime then
 		local now = GetTime()
@@ -2499,7 +2647,31 @@ function ShamanPower:UpdateTotemProgressBars()
 			local slot = self.ElementToSlot[element]
 			local haveTotem, totemName, startTime, duration = GetTotemInfo(slot)
 
-			if haveTotem and duration and duration > 0 then
+			-- Check if the active totem is popped out as a single totem
+			local totemIsPoppedOut = false
+			if haveTotem and totemName then
+				for key, popOutBars in pairs(self.poppedOutProgressBars or {}) do
+					if popOutBars.element == element and popOutBars.spellName then
+						local ok1, result1 = pcall(string.find, totemName, popOutBars.spellName, 1, true)
+						local ok2, result2 = pcall(string.find, popOutBars.spellName, totemName, 1, true)
+						if (ok1 and result1) or (ok2 and result2) then
+							totemIsPoppedOut = true
+							break
+						end
+					end
+				end
+			end
+
+			-- If totem is popped out, hide main bar and let pop-out handle it
+			if totemIsPoppedOut then
+				bars.bg:Hide()
+				bars.bar:Hide()
+				if bars.insideTextTop then bars.insideTextTop:Hide() end
+				if bars.insideTextBottom then bars.insideTextBottom:Hide() end
+				if bars.aboveBarText then bars.aboveBarText:Hide() end
+				if bars.belowBarText then bars.belowBarText:Hide() end
+				if bars.iconText then bars.iconText:Hide() end
+			elseif haveTotem and duration and duration > 0 then
 				local remaining = (startTime + duration) - GetTime()
 				local pct = remaining / duration
 
@@ -2575,8 +2747,69 @@ function ShamanPower:UpdateTotemProgressBars()
 		end
 	end
 
+	-- Update popped-out single totem progress bars
+	self:UpdatePoppedOutProgressBars()
+
 	-- Update active totem overlays
 	self:UpdateActiveTotemOverlays()
+end
+
+-- Update progress bars on popped-out single totems
+function ShamanPower:UpdatePoppedOutProgressBars()
+	if not self.poppedOutProgressBars then return end
+
+	local textLocation = self.opt.durationTextLocation or "none"
+	local barSize = self.opt.durationBarHeight or 3
+
+	for key, bars in pairs(self.poppedOutProgressBars) do
+		local frame = self.poppedOutFrames[key]
+		if frame and bars.element and bars.spellName then
+			local slot = self.ElementToSlot[bars.element]
+			local haveTotem, activeTotemName, startTime, duration = GetTotemInfo(slot)
+
+			-- Check if this pop-out's totem is the active one
+			local isActive = false
+			if haveTotem and activeTotemName and bars.spellName then
+				local ok1, result1 = pcall(string.find, activeTotemName, bars.spellName, 1, true)
+				local ok2, result2 = pcall(string.find, bars.spellName, activeTotemName, 1, true)
+				if (ok1 and result1) or (ok2 and result2) then
+					isActive = true
+				end
+			end
+
+			if isActive and duration and duration > 0 then
+				local remaining = (startTime + duration) - GetTime()
+				local pct = remaining / duration
+
+				if pct > 0 and pct <= 1 then
+					-- Update bar size
+					local width = (bars.maxWidth or 32) * pct
+					bars.bar:SetWidth(math.max(1, width))
+					bars.bar:SetHeight(barSize)
+					bars.bg:SetHeight(barSize)
+					bars.bg:Show()
+					bars.bar:Show()
+
+					-- Update duration text if option is set to show on icon
+					if textLocation == "icon" then
+						local durationStr = FormatDuration(remaining)
+						bars.text:SetText(durationStr)
+						bars.text:Show()
+					else
+						bars.text:Hide()
+					end
+				else
+					bars.bg:Hide()
+					bars.bar:Hide()
+					bars.text:Hide()
+				end
+			else
+				bars.bg:Hide()
+				bars.bar:Hide()
+				bars.text:Hide()
+			end
+		end
+	end
 end
 
 -- Update progress bar size when option changes
@@ -2867,6 +3100,54 @@ function ShamanPower:UpdateActiveTotemOverlays()
 			end
 		end
 	end
+
+	-- Update active borders on popped-out single totems
+	self:UpdatePoppedOutActiveBorders()
+end
+
+-- Update active borders on popped-out single totems
+function ShamanPower:UpdatePoppedOutActiveBorders()
+	if not self.poppedOutFrames then return end
+
+	for key, frame in pairs(self.poppedOutFrames) do
+		if key:match("^single_") and frame.element and frame.spellName then
+			local element = frame.element
+			local slot = self.ElementToSlot and self.ElementToSlot[element] or element
+			local haveTotem, activeTotemName = GetTotemInfo(slot)
+
+			local isActive = false
+			if haveTotem and activeTotemName and frame.spellName then
+				-- Check if active totem matches this pop-out's totem
+				local ok1, result1 = pcall(string.find, activeTotemName, frame.spellName, 1, true)
+				local ok2, result2 = pcall(string.find, frame.spellName, activeTotemName, 1, true)
+				if (ok1 and result1) or (ok2 and result2) then
+					isActive = true
+				end
+			end
+
+			-- Show/hide active border
+			if frame.activeBorder then
+				if isActive then
+					frame.activeBorder:Show()
+				else
+					frame.activeBorder:Hide()
+				end
+			end
+
+			-- Desaturate/restore icon based on active state
+			if frame.button and frame.button.icon then
+				if isActive then
+					frame.button.icon:SetDesaturated(false)
+					frame.button.icon:SetAlpha(1)
+				else
+					-- Optionally desaturate when not active (matching main bar behavior)
+					-- For now, keep it normal since it's a standalone tracker
+					frame.button.icon:SetDesaturated(false)
+					frame.button.icon:SetAlpha(1)
+				end
+			end
+		end
+	end
 end
 
 -- ============================================================================
@@ -2925,6 +3206,1156 @@ end
 
 -- Track if we've already hooked the totem buttons
 ShamanPower.flyoutHooksInstalled = {}
+
+-- ============================================================================
+-- POP-OUT TRACKERS
+-- Allow any button to be "popped out" into a standalone, movable tracker
+-- ============================================================================
+
+-- Storage for popped-out frames by key
+ShamanPower.poppedOutFrames = {}
+
+-- Storage for pop-out pulse/active overlays (for single totem pop-outs)
+ShamanPower.poppedOutOverlays = {}
+
+-- Storage for pop-out duration bars (for single totem pop-outs)
+ShamanPower.poppedOutProgressBars = {}
+
+-- Create a pop-out frame container with cog wheel (top-right) and title below icon
+function ShamanPower:CreatePopOutFrame(key, buttonSize, title)
+	-- key: "totem_earth", "single_1_3", "cd_1", etc.
+	if self.poppedOutFrames[key] then
+		return self.poppedOutFrames[key]
+	end
+
+	local frameWidth = buttonSize + 20
+	local titleHeight = 14
+	local cogSize = 12
+	local frameHeight = buttonSize + titleHeight + cogSize + 12
+
+	local frame = CreateFrame("Frame", "ShamanPowerPopOut_" .. key, UIParent, "BackdropTemplate")
+	frame:SetSize(frameWidth, frameHeight)
+	frame:SetMovable(true)
+	frame:EnableMouse(true)
+	frame:SetClampedToScreen(true)
+	frame:RegisterForDrag("LeftButton")
+	frame.key = key
+	frame.buttonSize = buttonSize
+	frame.title = title
+
+	-- Background frame
+	frame:SetBackdrop({
+		bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
+		edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+		tile = true, tileSize = 16, edgeSize = 12,
+		insets = { left = 2, right = 2, top = 2, bottom = 2 }
+	})
+	frame:SetBackdropColor(0, 0, 0, 0.8)
+	frame:SetBackdropBorderColor(0.4, 0.4, 0.4, 1)
+
+	-- Cog wheel settings button (top-right corner)
+	local cogBtn = CreateFrame("Button", frame:GetName() .. "Cog", frame)
+	cogBtn:SetSize(cogSize, cogSize)
+	cogBtn:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -4, -4)
+	cogBtn:SetNormalTexture("Interface\\WorldMap\\Gear_64")
+	cogBtn:GetNormalTexture():SetTexCoord(0, 0.5, 0, 0.5)
+	cogBtn:SetHighlightTexture("Interface\\WorldMap\\Gear_64")
+	cogBtn:GetHighlightTexture():SetTexCoord(0, 0.5, 0, 0.5)
+	cogBtn:SetScript("OnClick", function()
+		ShamanPower:ShowPopOutSettingsPanel(key, frame)
+	end)
+	cogBtn:SetScript("OnEnter", function(self)
+		GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+		GameTooltip:SetText("Settings")
+		GameTooltip:Show()
+	end)
+	cogBtn:SetScript("OnLeave", function()
+		GameTooltip:Hide()
+	end)
+	frame.cogBtn = cogBtn
+
+	-- Title text (below where the icon will be placed)
+	local titleText = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+	titleText:SetPoint("BOTTOM", frame, "BOTTOM", 0, 4)
+	titleText:SetText(title or "Pop-Out")
+	titleText:SetTextColor(1, 0.82, 0)  -- Gold color
+	frame.titleText = titleText
+
+	-- Restore position or default to center
+	local pos = self.opt.poppedOutPositions and self.opt.poppedOutPositions[key]
+	if pos then
+		frame:SetPoint(pos.point, UIParent, pos.relPoint, pos.x, pos.y)
+	else
+		frame:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
+	end
+
+	-- Apply scale/opacity from settings
+	local settings = self.opt.poppedOutSettings and self.opt.poppedOutSettings[key] or {}
+	local scale = settings.scale or self.opt.poppedOutDefaultScale or 1.0
+	local opacity = settings.opacity or self.opt.poppedOutDefaultOpacity or 1.0
+	frame:SetScale(scale)
+	frame:SetAlpha(opacity)
+
+	-- Check if frame should be hidden (show only icon)
+	local hideFrame = settings.hideFrame
+	if hideFrame then
+		frame:SetBackdrop(nil)
+		titleText:Hide()
+		cogBtn:Hide()
+	end
+
+	-- Drag to move (no ALT needed - drag from title area or frame edge)
+	frame:SetScript("OnDragStart", function(self)
+		self:StartMoving()
+	end)
+	frame:SetScript("OnDragStop", function(self)
+		self:StopMovingOrSizing()
+		local point, _, relPoint, x, y = self:GetPoint()
+		ShamanPower.opt.poppedOutPositions = ShamanPower.opt.poppedOutPositions or {}
+		ShamanPower.opt.poppedOutPositions[key] = {point=point, relPoint=relPoint, x=x, y=y}
+	end)
+
+	-- Middle-click on frame to return to bar
+	frame:SetScript("OnMouseUp", function(self, button)
+		if button == "MiddleButton" then
+			if InCombatLockdown() then
+				print("|cffff0000ShamanPower:|r Cannot modify pop-outs during combat")
+				return
+			end
+			ShamanPower:ReturnPopOutToBar(key)
+		end
+	end)
+
+	self.poppedOutFrames[key] = frame
+	return frame
+end
+
+-- Settings panel for pop-out frames (with sliders)
+ShamanPower.popOutSettingsPanel = nil
+
+function ShamanPower:ShowPopOutSettingsPanel(key, popOutFrame)
+	-- Close existing panel if open for different key
+	if self.popOutSettingsPanel and self.popOutSettingsPanel:IsShown() then
+		if self.popOutSettingsPanel.currentKey == key then
+			-- Don't close if we just opened it (debounce for double-click events)
+			local openTime = self.popOutSettingsPanel.openTime or 0
+			if GetTime() - openTime < 0.3 then
+				return  -- Too soon, ignore this toggle
+			end
+			self.popOutSettingsPanel:Hide()
+			return
+		end
+		self.popOutSettingsPanel:Hide()
+	end
+
+	-- Create panel if it doesn't exist
+	if not self.popOutSettingsPanel then
+		local panel = CreateFrame("Frame", "ShamanPowerPopOutSettingsPanel", UIParent, "BackdropTemplate")
+		panel:SetSize(180, 200)  -- Taller to fit flyout direction option
+		panel:SetFrameStrata("DIALOG")
+		panel:SetMovable(true)
+		panel:EnableMouse(true)
+		panel:SetClampedToScreen(true)
+		panel:RegisterForDrag("LeftButton")
+		panel:SetScript("OnDragStart", panel.StartMoving)
+		panel:SetScript("OnDragStop", panel.StopMovingOrSizing)
+
+		panel:SetBackdrop({
+			bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
+			edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+			tile = true, tileSize = 16, edgeSize = 16,
+			insets = { left = 4, right = 4, top = 4, bottom = 4 }
+		})
+		panel:SetBackdropColor(0.1, 0.1, 0.1, 0.95)
+		panel:SetBackdropBorderColor(0.4, 0.4, 0.4, 1)
+
+		-- Title
+		local title = panel:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+		title:SetPoint("TOP", panel, "TOP", 0, -8)
+		title:SetText("Pop-Out Settings")
+		title:SetTextColor(1, 0.82, 0)
+		panel.title = title
+
+		-- Close button
+		local closeBtn = CreateFrame("Button", nil, panel, "UIPanelCloseButton")
+		closeBtn:SetSize(20, 20)
+		closeBtn:SetPoint("TOPRIGHT", panel, "TOPRIGHT", -2, -2)
+
+		-- Scale slider
+		local scaleLabel = panel:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+		scaleLabel:SetPoint("TOPLEFT", panel, "TOPLEFT", 12, -28)
+		scaleLabel:SetText("Scale:")
+
+		local scaleValue = panel:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+		scaleValue:SetPoint("TOPRIGHT", panel, "TOPRIGHT", -12, -28)
+		panel.scaleValue = scaleValue
+
+		local scaleSlider = CreateFrame("Slider", "ShamanPowerPopOutScaleSlider", panel, "OptionsSliderTemplate")
+		scaleSlider:SetPoint("TOPLEFT", panel, "TOPLEFT", 12, -42)
+		scaleSlider:SetPoint("TOPRIGHT", panel, "TOPRIGHT", -12, -42)
+		scaleSlider:SetHeight(17)
+		scaleSlider:SetMinMaxValues(0.5, 3.0)
+		scaleSlider:SetValueStep(0.05)
+		scaleSlider:SetObeyStepOnDrag(true)
+		scaleSlider.Low:SetText("50%")
+		scaleSlider.High:SetText("300%")
+		scaleSlider.Text:SetText("")
+		-- Add visible track background
+		local scaleBg = scaleSlider:CreateTexture(nil, "BACKGROUND")
+		scaleBg:SetPoint("TOPLEFT", scaleSlider, "TOPLEFT", 0, -5)
+		scaleBg:SetPoint("BOTTOMRIGHT", scaleSlider, "BOTTOMRIGHT", 0, 5)
+		scaleBg:SetColorTexture(0.3, 0.3, 0.3, 0.8)
+		local scaleBorder = scaleSlider:CreateTexture(nil, "BORDER")
+		scaleBorder:SetPoint("TOPLEFT", scaleBg, "TOPLEFT", -1, 1)
+		scaleBorder:SetPoint("BOTTOMRIGHT", scaleBg, "BOTTOMRIGHT", 1, -1)
+		scaleBorder:SetColorTexture(0.5, 0.5, 0.5, 1)
+		scaleSlider:SetScript("OnValueChanged", function(self, value)
+			value = math.floor(value * 20 + 0.5) / 20  -- Round to nearest 0.05
+			panel.scaleValue:SetText(math.floor(value * 100) .. "%")
+			if panel.currentKey then
+				ShamanPower:SetPopOutScale(panel.currentKey, value)
+			end
+		end)
+		panel.scaleSlider = scaleSlider
+
+		-- Opacity slider
+		local opacityLabel = panel:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+		opacityLabel:SetPoint("TOPLEFT", panel, "TOPLEFT", 12, -70)
+		opacityLabel:SetText("Opacity:")
+
+		local opacityValue = panel:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+		opacityValue:SetPoint("TOPRIGHT", panel, "TOPRIGHT", -12, -70)
+		panel.opacityValue = opacityValue
+
+		local opacitySlider = CreateFrame("Slider", "ShamanPowerPopOutOpacitySlider", panel, "OptionsSliderTemplate")
+		opacitySlider:SetPoint("TOPLEFT", panel, "TOPLEFT", 12, -84)
+		opacitySlider:SetPoint("TOPRIGHT", panel, "TOPRIGHT", -12, -84)
+		opacitySlider:SetHeight(17)
+		opacitySlider:SetMinMaxValues(0.1, 1.0)
+		opacitySlider:SetValueStep(0.05)
+		opacitySlider:SetObeyStepOnDrag(true)
+		opacitySlider.Low:SetText("10%")
+		opacitySlider.High:SetText("100%")
+		opacitySlider.Text:SetText("")
+		-- Add visible track background
+		local opacityBg = opacitySlider:CreateTexture(nil, "BACKGROUND")
+		opacityBg:SetPoint("TOPLEFT", opacitySlider, "TOPLEFT", 0, -5)
+		opacityBg:SetPoint("BOTTOMRIGHT", opacitySlider, "BOTTOMRIGHT", 0, 5)
+		opacityBg:SetColorTexture(0.3, 0.3, 0.3, 0.8)
+		local opacityBorder = opacitySlider:CreateTexture(nil, "BORDER")
+		opacityBorder:SetPoint("TOPLEFT", opacityBg, "TOPLEFT", -1, 1)
+		opacityBorder:SetPoint("BOTTOMRIGHT", opacityBg, "BOTTOMRIGHT", 1, -1)
+		opacityBorder:SetColorTexture(0.5, 0.5, 0.5, 1)
+		opacitySlider:SetScript("OnValueChanged", function(self, value)
+			value = math.floor(value * 20 + 0.5) / 20  -- Round to nearest 0.05
+			panel.opacityValue:SetText(math.floor(value * 100) .. "%")
+			if panel.currentKey then
+				ShamanPower:SetPopOutOpacity(panel.currentKey, value)
+			end
+		end)
+		panel.opacitySlider = opacitySlider
+
+		-- Hide Frame checkbox
+		local hideFrameCheck = CreateFrame("CheckButton", "ShamanPowerPopOutHideFrameCheck", panel, "UICheckButtonTemplate")
+		hideFrameCheck:SetSize(22, 22)
+		hideFrameCheck:SetPoint("TOPLEFT", panel, "TOPLEFT", 8, -108)
+		hideFrameCheck.text = hideFrameCheck:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+		hideFrameCheck.text:SetPoint("LEFT", hideFrameCheck, "RIGHT", 2, 0)
+		hideFrameCheck.text:SetText("Hide Frame (icon only)")
+		hideFrameCheck:SetScript("OnClick", function(self)
+			if panel.currentKey then
+				ShamanPower:TogglePopOutFrame(panel.currentKey)
+			end
+		end)
+		panel.hideFrameCheck = hideFrameCheck
+
+		-- Flyout Direction section (only for element pop-outs)
+		local flyoutLabel = panel:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+		flyoutLabel:SetPoint("TOPLEFT", panel, "TOPLEFT", 12, -132)
+		flyoutLabel:SetText("Flyout Direction:")
+		panel.flyoutLabel = flyoutLabel
+
+		-- Create direction buttons
+		local directions = {"Top", "Bottom", "Left", "Right"}
+		local dirButtons = {}
+		local btnWidth = 38
+		local btnSpacing = 2
+		local startX = 12
+
+		for i, dir in ipairs(directions) do
+			local btn = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
+			btn:SetSize(btnWidth, 18)
+			btn:SetPoint("TOPLEFT", panel, "TOPLEFT", startX + (i-1) * (btnWidth + btnSpacing), -145)
+			btn:SetText(dir)
+			btn:GetFontString():SetFont("Fonts\\FRIZQT__.TTF", 9)
+			btn.direction = dir:lower()
+			btn:SetScript("OnClick", function(self)
+				if panel.currentKey then
+					ShamanPower:SetPopOutFlyoutDirection(panel.currentKey, self.direction)
+					-- Update button highlights
+					for _, b in ipairs(dirButtons) do
+						if b.direction == self.direction then
+							b:SetNormalFontObject("GameFontHighlight")
+						else
+							b:SetNormalFontObject("GameFontNormalSmall")
+						end
+					end
+				end
+			end)
+			dirButtons[i] = btn
+		end
+		panel.flyoutDirButtons = dirButtons
+
+		-- Return to Bar button
+		local returnBtn = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
+		returnBtn:SetSize(120, 22)
+		returnBtn:SetPoint("BOTTOM", panel, "BOTTOM", 0, 8)
+		returnBtn:SetText("Return to Bar")
+		returnBtn:SetScript("OnClick", function()
+			if panel.currentKey then
+				panel:Hide()
+				ShamanPower:ReturnPopOutToBar(panel.currentKey)
+			end
+		end)
+		panel.returnBtn = returnBtn
+
+		self.popOutSettingsPanel = panel
+	end
+
+	local panel = self.popOutSettingsPanel
+	panel.currentKey = key
+
+	-- Get current settings
+	local settings = self.opt.poppedOutSettings and self.opt.poppedOutSettings[key] or {}
+	local currentScale = settings.scale or self.opt.poppedOutDefaultScale or 1.0
+	local currentOpacity = settings.opacity or self.opt.poppedOutDefaultOpacity or 1.0
+	local currentHideFrame = settings.hideFrame or false
+	local currentFlyoutDir = settings.flyoutDirection or "bottom"
+
+	-- Update controls
+	panel.scaleSlider:SetValue(currentScale)
+	panel.scaleValue:SetText(math.floor(currentScale * 100) .. "%")
+	panel.opacitySlider:SetValue(currentOpacity)
+	panel.opacityValue:SetText(math.floor(currentOpacity * 100) .. "%")
+	panel.hideFrameCheck:SetChecked(currentHideFrame)
+
+	-- Show/hide flyout direction option (only for element pop-outs)
+	local isElementPopOut = key:match("^totem_") ~= nil
+	if panel.flyoutLabel then
+		if isElementPopOut then
+			panel.flyoutLabel:Show()
+			for _, btn in ipairs(panel.flyoutDirButtons) do
+				btn:Show()
+				-- Highlight current direction
+				if btn.direction == currentFlyoutDir then
+					btn:SetNormalFontObject("GameFontHighlight")
+				else
+					btn:SetNormalFontObject("GameFontNormalSmall")
+				end
+			end
+			panel:SetHeight(200)
+		else
+			panel.flyoutLabel:Hide()
+			for _, btn in ipairs(panel.flyoutDirButtons) do
+				btn:Hide()
+			end
+			panel:SetHeight(160)
+		end
+	end
+
+	-- Position near the pop-out frame
+	panel:ClearAllPoints()
+	panel:SetPoint("TOPLEFT", popOutFrame, "TOPRIGHT", 5, 0)
+
+	panel.openTime = GetTime()  -- Track when opened for debounce
+	panel:Show()
+end
+
+-- Set scale for a pop-out frame
+function ShamanPower:SetPopOutScale(key, scale)
+	local frame = self.poppedOutFrames[key]
+	if frame then
+		-- Get current center position before scaling
+		local oldScale = frame:GetScale()
+		local centerX, centerY = frame:GetCenter()
+		if centerX and centerY then
+			-- Convert to screen coordinates
+			centerX = centerX * oldScale
+			centerY = centerY * oldScale
+
+			-- Apply new scale
+			frame:SetScale(scale)
+
+			-- Reposition so center stays in same place
+			frame:ClearAllPoints()
+			frame:SetPoint("CENTER", UIParent, "BOTTOMLEFT", centerX / scale, centerY / scale)
+
+			-- Save new position
+			local point, _, relPoint, x, y = frame:GetPoint()
+			self.opt.poppedOutPositions = self.opt.poppedOutPositions or {}
+			self.opt.poppedOutPositions[key] = {point=point, relPoint=relPoint, x=x, y=y}
+		else
+			frame:SetScale(scale)
+		end
+	end
+	self.opt.poppedOutSettings = self.opt.poppedOutSettings or {}
+	self.opt.poppedOutSettings[key] = self.opt.poppedOutSettings[key] or {}
+	self.opt.poppedOutSettings[key].scale = scale
+end
+
+-- Set opacity for a pop-out frame
+function ShamanPower:SetPopOutOpacity(key, opacity)
+	local frame = self.poppedOutFrames[key]
+	if frame then
+		frame:SetAlpha(opacity)
+	end
+	self.opt.poppedOutSettings = self.opt.poppedOutSettings or {}
+	self.opt.poppedOutSettings[key] = self.opt.poppedOutSettings[key] or {}
+	self.opt.poppedOutSettings[key].opacity = opacity
+end
+
+-- Set flyout direction for a popped-out element
+function ShamanPower:SetPopOutFlyoutDirection(key, direction)
+	self.opt.poppedOutSettings = self.opt.poppedOutSettings or {}
+	self.opt.poppedOutSettings[key] = self.opt.poppedOutSettings[key] or {}
+	self.opt.poppedOutSettings[key].flyoutDirection = direction
+
+	-- Get element from key and re-layout flyout
+	local elementName = key:match("^totem_(.+)$")
+	if elementName then
+		local element = self.ElementToID[elementName:upper()]
+		if element and self.totemFlyouts[element] then
+			self:LayoutFlyoutButtons(self.totemFlyouts[element])
+		end
+	end
+end
+
+-- Toggle frame visibility (show only icon or full frame)
+function ShamanPower:TogglePopOutFrame(key)
+	self.opt.poppedOutSettings = self.opt.poppedOutSettings or {}
+	self.opt.poppedOutSettings[key] = self.opt.poppedOutSettings[key] or {}
+
+	local settings = self.opt.poppedOutSettings[key]
+	settings.hideFrame = not settings.hideFrame
+
+	local frame = self.poppedOutFrames[key]
+	if frame then
+		if settings.hideFrame then
+			-- Hide frame decorations, show only icon
+			frame:SetBackdrop(nil)
+			if frame.titleText then frame.titleText:Hide() end
+			if frame.cogBtn then frame.cogBtn:Hide() end
+			-- Resize to just fit the button
+			frame:SetSize(frame.buttonSize + 4, frame.buttonSize + 4)
+			-- Reposition button
+			if frame.button then
+				frame.button:ClearAllPoints()
+				frame.button:SetPoint("CENTER", frame, "CENTER", 0, 0)
+			end
+		else
+			-- Show full frame with decorations
+			frame:SetBackdrop({
+				bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
+				edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+				tile = true, tileSize = 16, edgeSize = 12,
+				insets = { left = 2, right = 2, top = 2, bottom = 2 }
+			})
+			frame:SetBackdropColor(0, 0, 0, 0.8)
+			frame:SetBackdropBorderColor(0.4, 0.4, 0.4, 1)
+			if frame.titleText then frame.titleText:Show() end
+			if frame.cogBtn then frame.cogBtn:Show() end
+			-- Resize to full size (cog at top, icon in middle, title at bottom)
+			local titleHeight = 14
+			local cogSize = 12
+			frame:SetSize(frame.buttonSize + 20, frame.buttonSize + titleHeight + cogSize + 12)
+			-- Reposition button (center, slightly above bottom to make room for title)
+			if frame.button then
+				frame.button:ClearAllPoints()
+				frame.button:SetPoint("CENTER", frame, "CENTER", 0, 2)
+			end
+		end
+	end
+
+	-- Update the settings panel checkbox if it's open for this key
+	if self.popOutSettingsPanel and self.popOutSettingsPanel:IsShown() and self.popOutSettingsPanel.currentKey == key then
+		self.popOutSettingsPanel.hideFrameCheck:SetChecked(settings.hideFrame)
+	end
+end
+
+-- Pop out a single totem from a flyout
+function ShamanPower:PopOutSingleTotem(element, totemIndex)
+	local key = "single_" .. element .. "_" .. totemIndex
+	if self.opt.poppedOut and self.opt.poppedOut[key] then return end  -- Already popped
+
+	self.opt.poppedOut = self.opt.poppedOut or {}
+	self.opt.poppedOut[key] = true
+
+	-- Get totem spell info
+	local spellID = self:GetTotemSpell(element, totemIndex)
+	local spellName = spellID and GetSpellInfo(spellID)
+	local icon = self:GetTotemIcon(element, totemIndex)
+	local totemName = self:GetTotemName(element, totemIndex) or "Totem"
+
+	-- Create frame with title
+	local frame = self:CreatePopOutFrame(key, 32, totemName)
+
+	-- Create a visible icon holder frame for the icon and all visual effects
+	local iconHolder = CreateFrame("Frame", frame:GetName() .. "IconHolder", frame)
+	iconHolder:SetSize(32, 32)
+	iconHolder:SetPoint("CENTER", frame, "CENTER", 0, 2)
+	frame.iconHolder = iconHolder
+
+	-- Create the icon texture on the holder
+	local iconTex = iconHolder:CreateTexture(nil, "ARTWORK")
+	iconTex:SetAllPoints()
+	iconTex:SetTexture(icon)
+	iconTex:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+	frame.iconTex = iconTex
+	iconHolder.icon = iconTex
+
+	-- Create invisible secure button on top for click handling only
+	local btn = CreateFrame("Button", frame:GetName() .. "Btn", frame,
+		"SecureActionButtonTemplate, SecureHandlerEnterLeaveTemplate")
+	btn:SetSize(32, 32)
+	btn:SetPoint("CENTER", frame, "CENTER", 0, 2)
+	btn:SetFrameLevel(iconHolder:GetFrameLevel() + 10)  -- Make sure it's on top
+	btn:RegisterForClicks("AnyUp", "AnyDown")
+	btn:SetAlpha(0)  -- Invisible - just handles clicks
+	btn.icon = iconTex  -- Reference the separate texture
+
+	-- Set up spell casting
+	if spellName then
+		btn:SetAttribute("type1", "spell")
+		btn:SetAttribute("spell1", spellName)
+	end
+
+	-- Right-click to destroy totem
+	local slot = self.ElementToSlot and self.ElementToSlot[element] or element
+	btn:SetAttribute("type2", "macro")
+	btn:SetAttribute("macrotext2", "/run DestroyTotem(" .. slot .. ")")
+
+	-- Tooltip
+	btn:SetScript("OnEnter", function(self)
+		GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+		if spellID then
+			GameTooltip:SetSpellByID(spellID)
+		end
+		GameTooltip:AddLine(" ")
+		GameTooltip:AddLine("|cff00ff00Middle-click:|r Return to bar", 1, 1, 1)
+		GameTooltip:AddLine("|cff00ff00SHIFT+Middle-click:|r Settings", 1, 1, 1)
+		GameTooltip:AddLine("|cff00ff00ALT+drag:|r Move (when frame hidden)", 1, 1, 1)
+		GameTooltip:Show()
+	end)
+	btn:SetScript("OnLeave", function()
+		GameTooltip:Hide()
+	end)
+
+	-- Middle-click handler on button (SHIFT = settings, plain = return to bar)
+	btn:HookScript("OnClick", function(self, button)
+		if button == "MiddleButton" then
+			if IsShiftKeyDown() then
+				-- SHIFT+Middle-click opens settings
+				ShamanPower:ShowPopOutSettingsPanel(key, frame)
+			else
+				-- Plain middle-click returns to bar
+				if InCombatLockdown() then
+					print("|cffff0000ShamanPower:|r Cannot modify pop-outs during combat")
+					return
+				end
+				ShamanPower:ReturnPopOutToBar(key)
+			end
+		end
+	end)
+
+	-- ALT+drag on button to move frame (works when frame is hidden)
+	btn:RegisterForDrag("LeftButton")
+	btn:SetScript("OnDragStart", function(self)
+		if IsAltKeyDown() then
+			frame:StartMoving()
+		end
+	end)
+	btn:SetScript("OnDragStop", function(self)
+		frame:StopMovingOrSizing()
+		local point, _, relPoint, x, y = frame:GetPoint()
+		ShamanPower.opt.poppedOutPositions = ShamanPower.opt.poppedOutPositions or {}
+		ShamanPower.opt.poppedOutPositions[key] = {point=point, relPoint=relPoint, x=x, y=y}
+	end)
+
+	-- Store references
+	frame.button = btn
+	frame.element = element
+	frame.totemIndex = totemIndex
+	frame.spellID = spellID
+	frame.spellName = spellName
+
+	-- Create pulse overlay on the visible iconHolder (Earth and Water totems can pulse)
+	if element == 1 or element == 3 then
+		local pulseOverlay = self:CreatePulseOverlay(iconHolder)
+		if pulseOverlay then
+			self.poppedOutOverlays[key] = pulseOverlay
+			pulseOverlay.element = element
+			pulseOverlay.totemIndex = totemIndex
+			pulseOverlay.spellID = spellID
+			pulseOverlay.spellName = spellName
+			-- Position the wipe properly for this button
+			self:PositionPulseWipe(pulseOverlay)
+		end
+	end
+
+	-- DISABLED: Active border causes a visual box artifact inside the icon
+	-- The UI-ActionButton-Border texture has inner content that shows through
+	--[[
+	-- Create active totem border on iconHolder (shows when this totem is placed)
+	local activeBorder = iconHolder:CreateTexture(nil, "OVERLAY")
+	activeBorder:SetPoint("TOPLEFT", iconHolder, "TOPLEFT", -2, 2)
+	activeBorder:SetPoint("BOTTOMRIGHT", iconHolder, "BOTTOMRIGHT", 2, -2)
+	activeBorder:SetTexture("Interface\\Buttons\\UI-ActionButton-Border")
+	activeBorder:SetBlendMode("ADD")
+	local colors = self.ElementColors[element]
+	activeBorder:SetVertexColor(colors.r, colors.g, colors.b, 0.8)
+	activeBorder:Hide()
+	frame.activeBorder = activeBorder
+	--]]
+	frame.activeBorder = nil
+
+	-- Create duration bar on iconHolder (same style as main totem bars)
+	local barColors = self.DurationBarColors[element]
+	local barSize = self.opt.durationBarHeight or 3
+
+	-- Background bar
+	local bgBar = iconHolder:CreateTexture(nil, "OVERLAY")
+	bgBar:SetColorTexture(0, 0, 0, 0.7)
+	bgBar:SetPoint("BOTTOMLEFT", iconHolder, "BOTTOMLEFT", 0, 0)
+	bgBar:SetPoint("BOTTOMRIGHT", iconHolder, "BOTTOMRIGHT", 0, 0)
+	bgBar:SetHeight(barSize)
+	bgBar:Hide()
+
+	-- Progress bar
+	local progressBar = iconHolder:CreateTexture(nil, "OVERLAY", nil, 1)
+	progressBar:SetColorTexture(barColors[1], barColors[2], barColors[3], 1)
+	progressBar:SetPoint("BOTTOMLEFT", iconHolder, "BOTTOMLEFT", 0, 0)
+	progressBar:SetHeight(barSize)
+	progressBar:SetWidth(1)
+	progressBar:Hide()
+
+	-- Duration text on icon
+	local durationText = iconHolder:CreateFontString(nil, "OVERLAY")
+	durationText:SetFont("Fonts\\FRIZQT__.TTF", 11, "OUTLINE")
+	durationText:SetPoint("CENTER", iconHolder, "CENTER", 0, 0)
+	durationText:SetTextColor(1, 1, 1)
+	durationText:Hide()
+
+	self.poppedOutProgressBars[key] = {
+		bg = bgBar,
+		bar = progressBar,
+		text = durationText,
+		maxWidth = iconHolder:GetWidth(),
+		element = element,
+		spellName = spellName
+	}
+
+	-- Check if frame should be hidden based on saved settings
+	local settings = self.opt.poppedOutSettings and self.opt.poppedOutSettings[key] or {}
+	if settings.hideFrame then
+		self:TogglePopOutFrame(key)  -- Apply hide
+		self:TogglePopOutFrame(key)  -- Toggle back since it was already set
+		-- Actually just apply the hidden state directly
+		frame:SetBackdrop(nil)
+		if frame.titleText then frame.titleText:Hide() end
+		if frame.cogBtn then frame.cogBtn:Hide() end
+		frame:SetSize(frame.buttonSize + 4, frame.buttonSize + 4)
+		iconHolder:ClearAllPoints()
+		iconHolder:SetPoint("CENTER", frame, "CENTER", 0, 0)
+		btn:ClearAllPoints()
+		btn:SetPoint("CENTER", frame, "CENTER", 0, 0)
+	end
+
+	-- Update main bar to hide this from flyout
+	self:UpdateFlyoutVisibility(element)
+
+	frame:Show()
+end
+
+-- Pop out an entire element with its flyout
+function ShamanPower:PopOutElementWithFlyout(element)
+	local elementName = self.Elements[element]:lower()  -- "earth", "fire", "water", "air"
+	local key = "totem_" .. elementName
+	if self.opt.poppedOut and self.opt.poppedOut[key] then return end
+
+	self.opt.poppedOut = self.opt.poppedOut or {}
+	self.opt.poppedOut[key] = true
+
+	-- Get element display name
+	local displayName = self.Elements[element]  -- "EARTH", "FIRE", etc.
+	displayName = displayName:sub(1,1) .. displayName:sub(2):lower()  -- "Earth", "Fire", etc.
+
+	-- Create frame with title
+	local frame = self:CreatePopOutFrame(key, 28, displayName)
+
+	-- Get the existing totem button
+	local totemBtn = self.totemButtons[element]
+	if not totemBtn then return end
+
+	-- Store original parent and points for restoration
+	frame.originalParent = totemBtn:GetParent()
+	frame.originalPoints = {}
+	for i = 1, totemBtn:GetNumPoints() do
+		frame.originalPoints[i] = {totemBtn:GetPoint(i)}
+	end
+
+	-- Reparent the totem button to this frame
+	totemBtn:SetParent(frame)
+	totemBtn:ClearAllPoints()
+	totemBtn:SetPoint("CENTER", frame, "CENTER", 0, 2)  -- Slightly above center to leave room for title below
+	totemBtn:SetScale(1)  -- Reset scale since frame handles it
+
+	-- Flyout buttons are children of totemBtn, so they move with it
+
+	frame.totemButton = totemBtn
+	frame.button = totemBtn  -- For TogglePopOutFrame compatibility
+	frame.element = element
+
+	-- ALT+drag on totem button to move frame (works when frame is hidden)
+	totemBtn:RegisterForDrag("LeftButton")
+	totemBtn:HookScript("OnDragStart", function(self)
+		if IsAltKeyDown() then
+			frame:StartMoving()
+		end
+	end)
+	totemBtn:HookScript("OnDragStop", function(self)
+		frame:StopMovingOrSizing()
+		local point, _, relPoint, x, y = frame:GetPoint()
+		ShamanPower.opt.poppedOutPositions = ShamanPower.opt.poppedOutPositions or {}
+		ShamanPower.opt.poppedOutPositions[key] = {point=point, relPoint=relPoint, x=x, y=y}
+	end)
+
+	-- Note: SHIFT+Middle-click for settings is handled by the main totem button OnClick handler
+
+	-- Check if frame should be hidden based on saved settings
+	local settings = self.opt.poppedOutSettings and self.opt.poppedOutSettings[key] or {}
+	if settings.hideFrame then
+		frame:SetBackdrop(nil)
+		if frame.titleText then frame.titleText:Hide() end
+		if frame.cogBtn then frame.cogBtn:Hide() end
+		frame:SetSize(frame.buttonSize + 4, frame.buttonSize + 4)
+		totemBtn:ClearAllPoints()
+		totemBtn:SetPoint("CENTER", frame, "CENTER", 0, 0)
+	end
+
+	-- Update main bar layout (skip this element)
+	self:UpdateMiniTotemBar()
+	self:UpdateTotemButtons()
+
+	frame:Show()
+end
+
+-- Cooldown type names for display
+local CooldownTypeNames = {
+	[1] = "Shield",
+	[2] = "Recall",
+	[3] = "Ankh",
+	[4] = "NS",
+	[5] = "Mana Tide",
+	[6] = "Bloodlust",
+	[7] = "Imbue",
+}
+
+-- Pop out a cooldown bar item
+function ShamanPower:PopOutCooldownItem(cooldownType)
+	local key = "cd_" .. cooldownType
+	if self.opt.poppedOut and self.opt.poppedOut[key] then return end
+
+	self.opt.poppedOut = self.opt.poppedOut or {}
+	self.opt.poppedOut[key] = true
+
+	-- Find the button
+	local btn = nil
+	for _, b in ipairs(self.cooldownButtons) do
+		if b.cooldownType == cooldownType then
+			btn = b
+			break
+		end
+	end
+	if not btn then return end
+
+	-- Get display name
+	local displayName = CooldownTypeNames[cooldownType] or "Cooldown"
+
+	-- Create frame with title
+	local buttonSize = btn:GetWidth() or 22
+	local frame = self:CreatePopOutFrame(key, buttonSize, displayName)
+
+	-- Store original parent and points for restoration
+	frame.originalParent = btn:GetParent()
+	frame.originalPoints = {}
+	for i = 1, btn:GetNumPoints() do
+		frame.originalPoints[i] = {btn:GetPoint(i)}
+	end
+
+	-- Reparent button
+	btn:SetParent(frame)
+	btn:ClearAllPoints()
+	btn:SetPoint("CENTER", frame, "CENTER", 0, 2)  -- Slightly above center to leave room for title below
+
+	frame.cooldownButton = btn
+	frame.button = btn  -- For TogglePopOutFrame compatibility
+	frame.cooldownType = cooldownType
+
+	-- ALT+drag on button to move frame (only add once)
+	if not btn.popOutDragHooked then
+		btn.popOutDragHooked = true
+		btn:RegisterForDrag("LeftButton")
+		btn:HookScript("OnDragStart", function(self)
+			if IsAltKeyDown() then
+				local popOutFrame = ShamanPower.poppedOutFrames["cd_" .. self.cooldownType]
+				if popOutFrame then
+					popOutFrame:StartMoving()
+				end
+			end
+		end)
+		btn:HookScript("OnDragStop", function(self)
+			local cdKey = "cd_" .. self.cooldownType
+			local popOutFrame = ShamanPower.poppedOutFrames[cdKey]
+			if popOutFrame then
+				popOutFrame:StopMovingOrSizing()
+				local point, _, relPoint, x, y = popOutFrame:GetPoint()
+				ShamanPower.opt.poppedOutPositions = ShamanPower.opt.poppedOutPositions or {}
+				ShamanPower.opt.poppedOutPositions[cdKey] = {point=point, relPoint=relPoint, x=x, y=y}
+			end
+		end)
+	end
+
+	-- Middle-click is handled by the initial handler in CreateCooldownBar
+	-- (no duplicate hook needed here)
+
+	-- Check if frame should be hidden based on saved settings
+	local settings = self.opt.poppedOutSettings and self.opt.poppedOutSettings[key] or {}
+	if settings.hideFrame then
+		frame:SetBackdrop(nil)
+		if frame.titleText then frame.titleText:Hide() end
+		if frame.cogBtn then frame.cogBtn:Hide() end
+		frame:SetSize(frame.buttonSize + 4, frame.buttonSize + 4)
+		btn:ClearAllPoints()
+		btn:SetPoint("CENTER", frame, "CENTER", 0, 0)
+	end
+
+	-- Update cooldown bar layout
+	self:UpdateCooldownBarLayout()
+
+	frame:Show()
+end
+
+-- Pop out Earth Shield button as standalone tracker
+function ShamanPower:PopOutEarthShield()
+	local key = "earthshield"
+	if self.opt.poppedOut and self.opt.poppedOut[key] then return end
+
+	local esBtn = _G["ShamanPowerEarthShieldBtn"]
+	if not esBtn then return end
+
+	self.opt.poppedOut = self.opt.poppedOut or {}
+	self.opt.poppedOut[key] = true
+
+	-- Create frame with title
+	local buttonSize = esBtn:GetWidth() or 26
+	local frame = self:CreatePopOutFrame(key, buttonSize, "Earth Shield")
+
+	-- Store original parent for restoration
+	frame.originalParent = esBtn:GetParent()
+
+	-- Reparent button
+	esBtn:SetParent(frame)
+	esBtn:ClearAllPoints()
+	esBtn:SetPoint("CENTER", frame, "CENTER", 0, 2)
+
+	frame.earthShieldButton = esBtn
+	frame.button = esBtn
+
+	-- ALT+drag on button to move frame (only add hook once)
+	if not esBtn.popOutDragHooked then
+		esBtn.popOutDragHooked = true
+		esBtn:RegisterForDrag("LeftButton")
+		esBtn:HookScript("OnDragStart", function(self)
+			if IsAltKeyDown() then
+				local popOutFrame = ShamanPower.poppedOutFrames["earthshield"]
+				if popOutFrame then
+					popOutFrame:StartMoving()
+				end
+			end
+		end)
+		esBtn:HookScript("OnDragStop", function(self)
+			local popOutFrame = ShamanPower.poppedOutFrames["earthshield"]
+			if popOutFrame then
+				popOutFrame:StopMovingOrSizing()
+				local point, _, relPoint, x, y = popOutFrame:GetPoint()
+				ShamanPower.opt.poppedOutPositions = ShamanPower.opt.poppedOutPositions or {}
+				ShamanPower.opt.poppedOutPositions["earthshield"] = {point=point, relPoint=relPoint, x=x, y=y}
+			end
+		end)
+	end
+
+	-- Middle-click is handled by the handler in CreateEarthShieldButton
+	-- (no duplicate hook needed here to avoid accumulation)
+
+	-- Check if frame should be hidden based on saved settings
+	local settings = self.opt.poppedOutSettings and self.opt.poppedOutSettings[key] or {}
+	if settings.hideFrame then
+		frame:SetBackdrop(nil)
+		if frame.titleText then frame.titleText:Hide() end
+		if frame.cogBtn then frame.cogBtn:Hide() end
+		frame:SetSize(frame.buttonSize + 4, frame.buttonSize + 4)
+		esBtn:ClearAllPoints()
+		esBtn:SetPoint("CENTER", frame, "CENTER", 0, 0)
+	end
+
+	-- Update totem bar layout
+	self:RepositionEarthShieldButton()
+
+	frame:Show()
+end
+
+-- Pop out Drop All button as standalone tracker
+function ShamanPower:PopOutDropAll()
+	local key = "dropall"
+	if self.opt.poppedOut and self.opt.poppedOut[key] then return end
+
+	local dropAllBtn = _G["ShamanPowerAutoDropAll"]
+	if not dropAllBtn then return end
+
+	self.opt.poppedOut = self.opt.poppedOut or {}
+	self.opt.poppedOut[key] = true
+
+	-- Create frame with title
+	local buttonSize = dropAllBtn:GetWidth() or 26
+	local frame = self:CreatePopOutFrame(key, buttonSize, "Drop All")
+
+	-- Store original parent for restoration
+	frame.originalParent = dropAllBtn:GetParent()
+
+	-- Reparent button
+	dropAllBtn:SetParent(frame)
+	dropAllBtn:ClearAllPoints()
+	dropAllBtn:SetPoint("CENTER", frame, "CENTER", 0, 2)
+
+	frame.dropAllButton = dropAllBtn
+	frame.button = dropAllBtn
+
+	-- ALT+drag on button to move frame (only add hook once)
+	if not dropAllBtn.popOutDragHooked then
+		dropAllBtn.popOutDragHooked = true
+		dropAllBtn:RegisterForDrag("LeftButton")
+		dropAllBtn:HookScript("OnDragStart", function(self)
+			if IsAltKeyDown() then
+				local popOutFrame = ShamanPower.poppedOutFrames["dropall"]
+				if popOutFrame then
+					popOutFrame:StartMoving()
+				end
+			end
+		end)
+		dropAllBtn:HookScript("OnDragStop", function(self)
+			local popOutFrame = ShamanPower.poppedOutFrames["dropall"]
+			if popOutFrame then
+				popOutFrame:StopMovingOrSizing()
+				local point, _, relPoint, x, y = popOutFrame:GetPoint()
+				ShamanPower.opt.poppedOutPositions = ShamanPower.opt.poppedOutPositions or {}
+				ShamanPower.opt.poppedOutPositions["dropall"] = {point=point, relPoint=relPoint, x=x, y=y}
+			end
+		end)
+	end
+
+	-- Middle-click is handled by the handler in UpdateDropAllButton
+	-- (no duplicate hook needed here to avoid accumulation)
+
+	-- Check if frame should be hidden based on saved settings
+	local settings = self.opt.poppedOutSettings and self.opt.poppedOutSettings[key] or {}
+	if settings.hideFrame then
+		frame:SetBackdrop(nil)
+		if frame.titleText then frame.titleText:Hide() end
+		if frame.cogBtn then frame.cogBtn:Hide() end
+		frame:SetSize(frame.buttonSize + 4, frame.buttonSize + 4)
+		dropAllBtn:ClearAllPoints()
+		dropAllBtn:SetPoint("CENTER", frame, "CENTER", 0, 0)
+	end
+
+	-- Update totem bar layout
+	self:UpdateMiniTotemBar()
+
+	frame:Show()
+end
+
+-- Check if Earth Shield is popped out
+function ShamanPower:IsEarthShieldPoppedOut()
+	if not self.opt.poppedOut then return false end
+	return self.opt.poppedOut["earthshield"] == true
+end
+
+-- Check if Drop All is popped out
+function ShamanPower:IsDropAllPoppedOut()
+	if not self.opt.poppedOut then return false end
+	return self.opt.poppedOut["dropall"] == true
+end
+
+-- Return a popped-out item to its original bar
+function ShamanPower:ReturnPopOutToBar(key)
+	if not self.opt.poppedOut then return end
+	self.opt.poppedOut[key] = nil
+
+	local frame = self.poppedOutFrames[key]
+	if not frame then return end
+
+	if key:match("^totem_") then
+		-- Element with flyout - reparent button back
+		local totemBtn = frame.totemButton
+		if totemBtn then
+			totemBtn:SetParent(UIParent)  -- Back to UIParent (original parent for secure buttons)
+			-- Position will be restored by UpdateTotemButtons
+		end
+		self:UpdateMiniTotemBar()
+		self:UpdateTotemButtons()
+
+	elseif key:match("^single_") then
+		-- Single totem - destroy the pop-out frame and button
+		if frame.button then
+			frame.button:Hide()
+			frame.button:SetParent(nil)
+		end
+		-- Clean up pulse overlay for this pop-out
+		if self.poppedOutOverlays[key] then
+			self.poppedOutOverlays[key] = nil
+		end
+		-- Clean up progress bars for this pop-out
+		if self.poppedOutProgressBars[key] then
+			self.poppedOutProgressBars[key] = nil
+		end
+		local element = frame.element
+		self:UpdateFlyoutVisibility(element)
+
+	elseif key:match("^cd_") then
+		-- Cooldown item - reparent back to cooldown bar
+		local btn = frame.cooldownButton
+		if btn and self.cooldownBar then
+			btn:SetParent(self.cooldownBar)
+			-- Position will be restored by UpdateCooldownBarLayout
+		end
+		self:UpdateCooldownBarLayout()
+
+	elseif key == "earthshield" then
+		-- Earth Shield - reparent back to UIParent
+		local esBtn = frame.earthShieldButton
+		if esBtn then
+			esBtn:SetParent(UIParent)
+			-- Position will be restored by RepositionEarthShieldButton
+		end
+		self:RepositionEarthShieldButton()
+
+	elseif key == "dropall" then
+		-- Drop All - reparent back to original parent
+		local dropAllBtn = frame.dropAllButton
+		if dropAllBtn and frame.originalParent then
+			dropAllBtn:SetParent(frame.originalParent)
+			-- Position will be restored by UpdateMiniTotemBar
+		end
+		self:UpdateMiniTotemBar()
+		-- Ensure Earth Shield is properly repositioned after Drop All returns
+		C_Timer.After(0.05, function()
+			self:RepositionEarthShieldButton()
+		end)
+	end
+
+	frame:Hide()
+	frame:SetParent(nil)
+	self.poppedOutFrames[key] = nil
+end
+
+-- Restore all popped-out trackers on load
+function ShamanPower:RestorePoppedOutTrackers()
+	if not self.opt.poppedOut then return end
+
+	for key, isPopped in pairs(self.opt.poppedOut) do
+		if isPopped then
+			if key:match("^totem_") then
+				local elementName = key:match("^totem_(.+)$")
+				if elementName then
+					local element = self.ElementToID[elementName:upper()]
+					if element then
+						-- Delay slightly to ensure buttons exist
+						C_Timer.After(0.1, function()
+							self.opt.poppedOut[key] = nil  -- Clear so PopOutElementWithFlyout can proceed
+							self:PopOutElementWithFlyout(element)
+						end)
+					end
+				end
+
+			elseif key:match("^single_") then
+				local elem, idx = key:match("^single_(%d+)_(%d+)$")
+				if elem and idx then
+					C_Timer.After(0.1, function()
+						self.opt.poppedOut[key] = nil  -- Clear so PopOutSingleTotem can proceed
+						self:PopOutSingleTotem(tonumber(elem), tonumber(idx))
+					end)
+				end
+
+			elseif key:match("^cd_") then
+				local cdType = key:match("^cd_(%d+)$")
+				if cdType then
+					C_Timer.After(0.2, function()
+						self.opt.poppedOut[key] = nil  -- Clear so PopOutCooldownItem can proceed
+						self:PopOutCooldownItem(tonumber(cdType))
+					end)
+				end
+
+			elseif key == "earthshield" then
+				C_Timer.After(0.2, function()
+					self.opt.poppedOut[key] = nil  -- Clear so PopOutEarthShield can proceed
+					self:PopOutEarthShield()
+				end)
+
+			elseif key == "dropall" then
+				C_Timer.After(0.2, function()
+					self.opt.poppedOut[key] = nil  -- Clear so PopOutDropAll can proceed
+					self:PopOutDropAll()
+				end)
+			end
+		end
+	end
+end
+
+-- Return all popped-out items to bars
+function ShamanPower:ReturnAllPopOutsToBar()
+	if not self.opt.poppedOut then return end
+
+	-- Make a copy of keys since we're modifying the table
+	local keys = {}
+	for key in pairs(self.opt.poppedOut) do
+		table.insert(keys, key)
+	end
+
+	for _, key in ipairs(keys) do
+		self:ReturnPopOutToBar(key)
+	end
+end
+
+-- Check if an element is popped out
+function ShamanPower:IsElementPoppedOut(element)
+	if not self.opt.poppedOut then return false end
+	local elementName = self.Elements[element]:lower()
+	local key = "totem_" .. elementName
+	return self.opt.poppedOut[key] == true
+end
+
+-- Check if a single totem is popped out
+function ShamanPower:IsSingleTotemPoppedOut(element, totemIndex)
+	if not self.opt.poppedOut then return false end
+	local key = "single_" .. element .. "_" .. totemIndex
+	return self.opt.poppedOut[key] == true
+end
+
+-- Check if a cooldown item is popped out
+function ShamanPower:IsCooldownPoppedOut(cooldownType)
+	if not self.opt.poppedOut then return false end
+	local key = "cd_" .. cooldownType
+	return self.opt.poppedOut[key] == true
+end
 
 -- Combat-functional totem buttons parented to UIParent (TotemTimers architecture)
 -- These buttons handle all totem interactions and support combat flyouts
@@ -2996,6 +4427,44 @@ function ShamanPower:CreateTotemButtons()
 			GameTooltip:Hide()
 		end)
 
+		-- Middle-click to pop out element with flyout (or SHIFT+Middle-click for settings when popped out)
+		btn:HookScript("OnClick", function(self, button)
+			if button == "MiddleButton" then
+				-- Debounce to prevent double-firing on down+up (same button is reparented)
+				local now = GetTime()
+				if ShamanPower.lastElementPopOutTime and (now - ShamanPower.lastElementPopOutTime) < 0.3 then
+					return
+				end
+				ShamanPower.lastElementPopOutTime = now
+
+				local elem = self.element
+				local elementName = ShamanPower.Elements[elem]:lower()
+				local key = "totem_" .. elementName
+
+				-- If popped out and SHIFT is held, open settings instead of returning
+				if ShamanPower.opt.poppedOut and ShamanPower.opt.poppedOut[key] then
+					if IsShiftKeyDown() then
+						local frame = ShamanPower.poppedOutFrames[key]
+						if frame then
+							ShamanPower:ShowPopOutSettingsPanel(key, frame)
+						end
+					else
+						if InCombatLockdown() then
+							print("|cffff0000ShamanPower:|r Cannot modify pop-outs during combat")
+							return
+						end
+						ShamanPower:ReturnPopOutToBar(key)
+					end
+				else
+					if InCombatLockdown() then
+						print("|cffff0000ShamanPower:|r Cannot pop out during combat")
+						return
+					end
+					ShamanPower:PopOutElementWithFlyout(elem)
+				end
+			end
+		end)
+
 		btn:Show()
 		self.totemButtons[element] = btn
 	end
@@ -3011,12 +4480,12 @@ function ShamanPower:PositionTotemButtons()
 	local isHorizontal = (self.opt.layout == "Horizontal")
 	local totemOrder = self.opt.totemBarOrder or {1, 2, 3, 4}
 
-	-- Check which totem buttons should be visible
+	-- Check which totem buttons should be visible (not hidden and not popped out)
 	local elementVisible = {
-		[1] = self.opt.totemBarShowEarth ~= false,
-		[2] = self.opt.totemBarShowFire ~= false,
-		[3] = self.opt.totemBarShowWater ~= false,
-		[4] = self.opt.totemBarShowAir ~= false,
+		[1] = self.opt.totemBarShowEarth ~= false and not self:IsElementPoppedOut(1),
+		[2] = self.opt.totemBarShowFire ~= false and not self:IsElementPoppedOut(2),
+		[3] = self.opt.totemBarShowWater ~= false and not self:IsElementPoppedOut(3),
+		[4] = self.opt.totemBarShowAir ~= false and not self:IsElementPoppedOut(4),
 	}
 
 	local visiblePosition = 0
@@ -3024,7 +4493,10 @@ function ShamanPower:PositionTotemButtons()
 		local element = totemOrder[position]
 		local btn = self.totemButtons[element]
 		if btn then
-			if not elementVisible[element] then
+			-- Skip popped out elements entirely (they're reparented elsewhere)
+			if self:IsElementPoppedOut(element) then
+				-- Don't touch popped out buttons
+			elseif not elementVisible[element] then
 				btn:Hide()
 			else
 				visiblePosition = visiblePosition + 1
@@ -3062,12 +4534,12 @@ function ShamanPower:UpdateTotemButtons()
 	local isHorizontal = (self.opt.layout == "Horizontal")
 	local totemOrder = self.opt.totemBarOrder or {1, 2, 3, 4}
 
-	-- Check which totem buttons should be visible
+	-- Check which totem buttons should be visible (not hidden in options and not popped out)
 	local elementVisible = {
-		[1] = self.opt.totemBarShowEarth ~= false,
-		[2] = self.opt.totemBarShowFire ~= false,
-		[3] = self.opt.totemBarShowWater ~= false,
-		[4] = self.opt.totemBarShowAir ~= false,
+		[1] = self.opt.totemBarShowEarth ~= false and not self:IsElementPoppedOut(1),
+		[2] = self.opt.totemBarShowFire ~= false and not self:IsElementPoppedOut(2),
+		[3] = self.opt.totemBarShowWater ~= false and not self:IsElementPoppedOut(3),
+		[4] = self.opt.totemBarShowAir ~= false and not self:IsElementPoppedOut(4),
 	}
 
 	local visiblePosition = 0
@@ -3076,30 +4548,60 @@ function ShamanPower:UpdateTotemButtons()
 		local btn = self.totemButtons[element]
 
 		if btn then
+			local isPoppedOut = self:IsElementPoppedOut(element)
+
+			-- Get assigned totem spell (always update, even if popped out)
+			local totemIndex = assignments[element] or 0
+			local spellID = nil
+			local spellName = nil
+			local icon = self.ElementIcons[element]
+
+			if totemIndex and totemIndex > 0 then
+				spellID = self:GetTotemSpell(element, totemIndex)
+				icon = self:GetTotemIcon(element, totemIndex)
+				if spellID then
+					spellName = GetSpellInfo(spellID)
+				end
+			end
+
+			-- Always update icon (even for popped out elements)
+			if btn.icon then
+				btn.icon:SetTexture(icon)
+			end
+
+			-- Always update spell attributes (even for popped out elements)
+			-- Clear old attributes
+			btn:SetAttribute("type", nil)
+			btn:SetAttribute("type1", nil)
+			btn:SetAttribute("spell", nil)
+			btn:SetAttribute("spell1", nil)
+			btn:SetAttribute("macrotext1", nil)
+
+			-- Set up spell casting (same logic as XML buttons)
+			if element == 4 and self.opt.enableTotemTwisting then
+				local wfName = GetSpellInfo(25587) or "Windfury Totem"
+				local goaName = GetSpellInfo(25359) or "Grace of Air Totem"
+				btn:SetAttribute("type1", "macro")
+				btn:SetAttribute("macrotext1", "/castsequence reset=10 " .. wfName .. ", " .. goaName)
+			elseif spellName then
+				btn:SetAttribute("type1", "spell")
+				btn:SetAttribute("spell1", spellName)
+			end
+
+			-- Right-click to destroy totem
+			local slot = self.ElementToSlot[element]
+			btn:SetAttribute("type2", "macro")
+			btn:SetAttribute("macrotext2", "/run DestroyTotem(" .. slot .. ")")
+
+			-- Handle visibility and positioning (only for non-popped-out elements)
 			if not elementVisible[element] then
-				btn:Hide()
+				-- Hide only if not popped out (popped out buttons are reparented)
+				if not isPoppedOut then
+					btn:Hide()
+				end
 			else
 				visiblePosition = visiblePosition + 1
 				btn:Show()
-
-				-- Get assigned totem spell
-				local totemIndex = assignments[element] or 0
-				local spellID = nil
-				local spellName = nil
-				local icon = self.ElementIcons[element]
-
-				if totemIndex and totemIndex > 0 then
-					spellID = self:GetTotemSpell(element, totemIndex)
-					icon = self:GetTotemIcon(element, totemIndex)
-					if spellID then
-						spellName = GetSpellInfo(spellID)
-					end
-				end
-
-				-- Update icon
-				if btn.icon then
-					btn.icon:SetTexture(icon)
-				end
 
 				-- Position button relative to visual container
 				btn:ClearAllPoints()
@@ -3111,32 +4613,6 @@ function ShamanPower:UpdateTotemButtons()
 
 				-- Match the scale of the visual container
 				btn:SetScale(self.opt.buffscale or 0.9)
-
-				-- Clear old attributes
-				btn:SetAttribute("type", nil)
-				btn:SetAttribute("type1", nil)
-				btn:SetAttribute("spell", nil)
-				btn:SetAttribute("spell1", nil)
-				btn:SetAttribute("macrotext1", nil)
-
-				-- Set up spell casting (same logic as XML buttons)
-				if element == 4 and self.opt.enableTotemTwisting then
-					local wfName = GetSpellInfo(25587) or "Windfury Totem"
-					local goaName = GetSpellInfo(25359) or "Grace of Air Totem"
-					btn:SetAttribute("type1", "macro")
-					btn:SetAttribute("macrotext1", "/castsequence reset=10 " .. wfName .. ", " .. goaName)
-					if btn.icon then
-						btn.icon:SetTexture("Interface\\Icons\\Spell_Nature_Windfury")
-					end
-				elseif spellName then
-					btn:SetAttribute("type1", "spell")
-					btn:SetAttribute("spell1", spellName)
-				end
-
-				-- Right-click: destroy totem
-				local slot = self.ElementToSlot[element]
-				btn:SetAttribute("type2", "macro")
-				btn:SetAttribute("macrotext2", "/run DestroyTotem(" .. slot .. ")")
 			end
 		end
 	end
@@ -3398,6 +4874,25 @@ function ShamanPower:CreateTotemFlyout(element)
 				end
 			end)
 
+			-- Middle-click to pop out single totem
+			btn:HookScript("OnClick", function(self, button)
+				if button == "MiddleButton" then
+					if InCombatLockdown() then
+						print("|cffff0000ShamanPower:|r Cannot pop out during combat")
+						return
+					end
+					local elem = element
+					local totemIdx = self.totemIndex
+					local key = "single_" .. elem .. "_" .. totemIdx
+
+					if ShamanPower.opt.poppedOut and ShamanPower.opt.poppedOut[key] then
+						ShamanPower:ReturnPopOutToBar(key)
+					else
+						ShamanPower:PopOutSingleTotem(elem, totemIdx)
+					end
+				end
+			end)
+
 			btn.totemIndex = totemIndex
 			btn.spellID = spellID
 			table.insert(flyout.buttons, btn)
@@ -3428,6 +4923,51 @@ function ShamanPower:LayoutFlyoutButtons(flyout, flyoutIsHorizontal)
 	local numButtons = #buttons
 	local buttonSize = flyout.buttonSize or 28
 	local spacing = flyout.spacing or 0
+
+	-- Check if this element is popped out and has a custom flyout direction
+	local element = flyout.element or (totemButton and totemButton.element)
+	local poppedOutDirection = nil
+	if element then
+		local elementName = self.Elements[element]:lower()
+		local key = "totem_" .. elementName
+		if self:IsElementPoppedOut(element) then
+			local settings = self.opt.poppedOutSettings and self.opt.poppedOutSettings[key]
+			if settings and settings.flyoutDirection then
+				poppedOutDirection = settings.flyoutDirection
+			end
+		end
+	end
+
+	-- If popped out with custom direction, use that instead of bar-based logic
+	if poppedOutDirection then
+		flyout.isHorizontal = (poppedOutDirection == "left" or poppedOutDirection == "right")
+
+		if numButtons == 0 then return end
+
+		-- Position based on custom direction
+		if poppedOutDirection == "top" then
+			for i, btn in ipairs(buttons) do
+				btn:ClearAllPoints()
+				btn:SetPoint("BOTTOM", totemButton, "TOP", 0, spacing + (i - 1) * (buttonSize + spacing))
+			end
+		elseif poppedOutDirection == "bottom" then
+			for i, btn in ipairs(buttons) do
+				btn:ClearAllPoints()
+				btn:SetPoint("TOP", totemButton, "BOTTOM", 0, -spacing - (i - 1) * (buttonSize + spacing))
+			end
+		elseif poppedOutDirection == "left" then
+			for i, btn in ipairs(buttons) do
+				btn:ClearAllPoints()
+				btn:SetPoint("RIGHT", totemButton, "LEFT", -spacing - (i - 1) * (buttonSize + spacing), 0)
+			end
+		elseif poppedOutDirection == "right" then
+			for i, btn in ipairs(buttons) do
+				btn:ClearAllPoints()
+				btn:SetPoint("LEFT", totemButton, "RIGHT", spacing + (i - 1) * (buttonSize + spacing), 0)
+			end
+		end
+		return
+	end
 
 	-- Default: if bar is horizontal, flyout is vertical (and vice versa)
 	if flyoutIsHorizontal == nil then
@@ -3604,11 +5144,17 @@ function ShamanPower:UpdateFlyoutVisibility(element)
 	local visibleIndex = 0
 	local visibleButtons = {}
 
-	-- First pass: determine which buttons should be visible (hide current assignment)
+	-- First pass: determine which buttons should be visible (hide current assignment and popped-out totems)
 	for _, btn in ipairs(flyout.buttons) do
-		if btn.totemIndex == currentTotemIndex then
+		local totemIdx = btn.totemIndex
+		local isPoppedOut = self:IsSingleTotemPoppedOut(element, totemIdx)
+
+		if totemIdx == currentTotemIndex or isPoppedOut then
 			-- Mark this button to be hidden (via attribute so secure handler knows)
 			btn:SetAttribute("isCurrentAssignment", true)
+			if isPoppedOut then
+				btn:Hide()  -- Explicitly hide popped-out totems
+			end
 		else
 			btn:SetAttribute("isCurrentAssignment", false)
 			visibleIndex = visibleIndex + 1
@@ -3621,8 +5167,42 @@ function ShamanPower:UpdateFlyoutVisibility(element)
 		return
 	end
 
+	-- Check if this element is popped out and has a custom flyout direction
+	local poppedOutDirection = nil
+	local elementName = self.Elements[element]:lower()
+	local key = "totem_" .. elementName
+	if self:IsElementPoppedOut(element) then
+		local settings = self.opt.poppedOutSettings and self.opt.poppedOutSettings[key]
+		if settings and settings.flyoutDirection then
+			poppedOutDirection = settings.flyoutDirection
+		end
+	end
+
 	-- Layout visible buttons relative to the totem button (parent)
-	if flyoutIsHorizontal then
+	if poppedOutDirection then
+		-- Use custom direction for popped-out element
+		if poppedOutDirection == "top" then
+			for i, btn in ipairs(visibleButtons) do
+				btn:ClearAllPoints()
+				btn:SetPoint("BOTTOM", totemButton, "TOP", 0, spacing + (i - 1) * (buttonSize + spacing))
+			end
+		elseif poppedOutDirection == "bottom" then
+			for i, btn in ipairs(visibleButtons) do
+				btn:ClearAllPoints()
+				btn:SetPoint("TOP", totemButton, "BOTTOM", 0, -spacing - (i - 1) * (buttonSize + spacing))
+			end
+		elseif poppedOutDirection == "left" then
+			for i, btn in ipairs(visibleButtons) do
+				btn:ClearAllPoints()
+				btn:SetPoint("RIGHT", totemButton, "LEFT", -spacing - (i - 1) * (buttonSize + spacing), 0)
+			end
+		elseif poppedOutDirection == "right" then
+			for i, btn in ipairs(visibleButtons) do
+				btn:ClearAllPoints()
+				btn:SetPoint("LEFT", totemButton, "RIGHT", spacing + (i - 1) * (buttonSize + spacing), 0)
+			end
+		end
+	elseif flyoutIsHorizontal then
 		if isVerticalLeft then
 			-- VerticalLeft: horizontal flyout extends to the LEFT
 			for i, btn in ipairs(visibleButtons) do
@@ -4201,6 +5781,39 @@ function ShamanPower:CreateCooldownBar()
 				end)
 			end
 
+			-- Middle-click to pop out cooldown item (or return/settings if already popped)
+			btn:HookScript("OnClick", function(self, button)
+				if button == "MiddleButton" then
+					local cdType = self.cooldownType
+					local key = "cd_" .. cdType
+
+					if ShamanPower.opt.poppedOut and ShamanPower.opt.poppedOut[key] then
+						-- Already popped out
+						if IsShiftKeyDown() then
+							-- SHIFT+middle-click opens settings
+							local frame = ShamanPower.poppedOutFrames[key]
+							if frame then
+								ShamanPower:ShowPopOutSettingsPanel(key, frame)
+							end
+						else
+							-- Plain middle-click returns to bar
+							if InCombatLockdown() then
+								print("|cffff0000ShamanPower:|r Cannot modify pop-outs during combat")
+								return
+							end
+							ShamanPower:ReturnPopOutToBar(key)
+						end
+					else
+						-- Not popped out, pop it out
+						if InCombatLockdown() then
+							print("|cffff0000ShamanPower:|r Cannot pop out during combat")
+							return
+						end
+						ShamanPower:PopOutCooldownItem(cdType)
+					end
+				end
+			end)
+
 			-- Track if button is hidden in options (still functional but not shown)
 			btn.isHiddenInOptions = not isEnabled
 			if not isEnabled then
@@ -4365,10 +5978,11 @@ function ShamanPower:UpdateCooldownBarLayout()
 	local cdLayout = self.opt.cdbarLayout or self.opt.layout
 	local isVertical = (cdLayout == "Vertical" or cdLayout == "VerticalLeft")
 
-	-- Count only visible buttons (not hidden in options)
+	-- Count only visible buttons (not hidden in options and not popped out)
 	local visibleButtons = {}
 	for _, btn in ipairs(self.cooldownButtons) do
-		if not btn.isHiddenInOptions then
+		local isPoppedOut = self:IsCooldownPoppedOut(btn.cooldownType)
+		if not btn.isHiddenInOptions and not isPoppedOut then
 			table.insert(visibleButtons, btn)
 		end
 	end
@@ -5816,13 +7430,14 @@ function ShamanPower:UpdateMiniTotemBar()
 	local padding = 4
 	local separatorSize = 12  -- Extra gap for separator
 	local showDropAll = self.opt.showDropAllButton ~= false  -- Default to true if not set
+	local dropAllPoppedOut = self:IsDropAllPoppedOut()
 
-	-- Check which totem buttons should be visible
+	-- Check which totem buttons should be visible (not hidden in options and not popped out)
 	local elementVisible = {
-		[1] = self.opt.totemBarShowEarth ~= false,  -- Earth
-		[2] = self.opt.totemBarShowFire ~= false,   -- Fire
-		[3] = self.opt.totemBarShowWater ~= false,  -- Water
-		[4] = self.opt.totemBarShowAir ~= false,    -- Air
+		[1] = self.opt.totemBarShowEarth ~= false and not self:IsElementPoppedOut(1),  -- Earth
+		[2] = self.opt.totemBarShowFire ~= false and not self:IsElementPoppedOut(2),   -- Fire
+		[3] = self.opt.totemBarShowWater ~= false and not self:IsElementPoppedOut(3),  -- Water
+		[4] = self.opt.totemBarShowAir ~= false and not self:IsElementPoppedOut(4),    -- Air
 	}
 
 	-- Count visible buttons
@@ -5834,21 +7449,23 @@ function ShamanPower:UpdateMiniTotemBar()
 	end
 
 	-- Resize the parent frame based on layout and visible button count
+	-- Don't include Drop All in size calculations if it's popped out
+	local includeDropAll = showDropAll and not dropAllPoppedOut
 	if isHorizontal then
 		-- Horizontal: wide and short
 		local totalWidth = (buttonSize * visibleCount) + (spacing * math.max(0, visibleCount - 1)) + (padding * 2)
-		if showDropAll and visibleCount > 0 then
+		if includeDropAll and visibleCount > 0 then
 			totalWidth = totalWidth + separatorSize + buttonSize
-		elseif showDropAll then
+		elseif includeDropAll then
 			totalWidth = buttonSize + (padding * 2)
 		end
 		self.autoButton:SetSize(math.max(totalWidth, buttonSize + (padding * 2)), buttonSize + (padding * 2))
 	else
 		-- Vertical: narrow and tall
 		local totalHeight = (buttonSize * visibleCount) + (spacing * math.max(0, visibleCount - 1)) + (padding * 2)
-		if showDropAll and visibleCount > 0 then
+		if includeDropAll and visibleCount > 0 then
 			totalHeight = totalHeight + separatorSize + buttonSize
-		elseif showDropAll then
+		elseif includeDropAll then
 			totalHeight = buttonSize + (padding * 2)
 		end
 		self.autoButton:SetSize(buttonSize + (padding * 2), math.max(totalHeight, buttonSize + (padding * 2)))
@@ -5944,7 +7561,11 @@ function ShamanPower:UpdateMiniTotemBar()
 	-- Reposition the Drop All button (after the separator)
 	local dropAllButton = _G["ShamanPowerAutoDropAll"]
 
-	if showDropAll and visibleCount > 0 then
+	-- Position Drop All button (only if not popped out)
+	if dropAllPoppedOut then
+		-- Drop All is popped out - hide separator, don't reposition button
+		separator:Hide()
+	elseif showDropAll and visibleCount > 0 then
 		separator:ClearAllPoints()
 		if isHorizontal then
 			-- Vertical separator line
@@ -6299,6 +7920,44 @@ function ShamanPower:CreateEarthShieldButton()
 	end)
 
 	esBtn:RegisterForClicks("AnyUp", "AnyDown")
+
+	-- Middle-click to pop out (or return/settings if already popped)
+	esBtn:HookScript("OnClick", function(self, button)
+		if button == "MiddleButton" then
+			-- Debounce
+			local now = GetTime()
+			if ShamanPower.lastESPopOutTime and (now - ShamanPower.lastESPopOutTime) < 0.3 then
+				return
+			end
+			ShamanPower.lastESPopOutTime = now
+
+			local key = "earthshield"
+			if ShamanPower.opt.poppedOut and ShamanPower.opt.poppedOut[key] then
+				-- Already popped out
+				if IsShiftKeyDown() then
+					-- SHIFT+middle-click opens settings
+					local frame = ShamanPower.poppedOutFrames[key]
+					if frame then
+						ShamanPower:ShowPopOutSettingsPanel(key, frame)
+					end
+				else
+					-- Plain middle-click returns to bar
+					if InCombatLockdown() then
+						print("|cffff0000ShamanPower:|r Cannot modify pop-outs during combat")
+						return
+					end
+					ShamanPower:ReturnPopOutToBar(key)
+				end
+			else
+				-- Not popped out, so pop it out
+				if InCombatLockdown() then
+					print("|cffff0000ShamanPower:|r Cannot pop out during combat")
+					return
+				end
+				ShamanPower:PopOutEarthShield()
+			end
+		end
+	end)
 end
 
 -- ============================================================================
@@ -6946,6 +8605,9 @@ function ShamanPower:RepositionEarthShieldButton()
 	if not esBtn or not esBtn:IsShown() then return end
 	if not self.autoButton then return end
 
+	-- Skip repositioning if Earth Shield is popped out
+	if self:IsEarthShieldPoppedOut() then return end
+
 	-- Match scale of other totem buttons
 	esBtn:SetScale(self.opt.buffscale or 0.9)
 
@@ -6953,22 +8615,24 @@ function ShamanPower:RepositionEarthShieldButton()
 	local buttonSize = 26
 	local spacing = self.opt.totemBarPadding or 2
 	local showDropAll = self.opt.showDropAllButton ~= false
+	local dropAllPoppedOut = self:IsDropAllPoppedOut()
 
 	-- Find the anchor point - either Drop All button or last visible totem button
 	local anchorFrame = nil
 	local dropAllBtn = _G["ShamanPowerAutoDropAll"]
 
-	if showDropAll and dropAllBtn and dropAllBtn:IsShown() then
-		-- Anchor to Drop All button
+	if showDropAll and dropAllBtn and dropAllBtn:IsShown() and not dropAllPoppedOut then
+		-- Anchor to Drop All button (only if not popped out)
 		anchorFrame = dropAllBtn
 	else
 		-- Find the last visible totem button based on totemBarOrder
+		-- Exclude popped-out elements (they're reparented elsewhere)
 		local totemOrder = self.opt.totemBarOrder or {1, 2, 3, 4}
 		local elementVisible = {
-			[1] = self.opt.totemBarShowEarth ~= false,
-			[2] = self.opt.totemBarShowFire ~= false,
-			[3] = self.opt.totemBarShowWater ~= false,
-			[4] = self.opt.totemBarShowAir ~= false,
+			[1] = self.opt.totemBarShowEarth ~= false and not self:IsElementPoppedOut(1),
+			[2] = self.opt.totemBarShowFire ~= false and not self:IsElementPoppedOut(2),
+			[3] = self.opt.totemBarShowWater ~= false and not self:IsElementPoppedOut(3),
+			[4] = self.opt.totemBarShowAir ~= false and not self:IsElementPoppedOut(4),
 		}
 
 		-- Find the last visible element in order
@@ -7012,15 +8676,15 @@ function ShamanPower:UpdateAutoButtonSize()
 	local buttonSize = 26
 	local spacing = self.opt.totemBarPadding or 2
 	local isHorizontal = (self.opt.layout == "Horizontal")
-	local showDropAll = self.opt.showDropAllButton ~= false
-	local showES = self.opt.totemBarShowEarthShield ~= false and self:HasEarthShield()
+	local showDropAll = self.opt.showDropAllButton ~= false and not self:IsDropAllPoppedOut()
+	local showES = self.opt.totemBarShowEarthShield ~= false and self:HasEarthShield() and not self:IsEarthShieldPoppedOut()
 
-	-- Count visible totem buttons
+	-- Count visible totem buttons (not hidden in options and not popped out)
 	local visibleCount = 0
-	if self.opt.totemBarShowEarth ~= false then visibleCount = visibleCount + 1 end
-	if self.opt.totemBarShowFire ~= false then visibleCount = visibleCount + 1 end
-	if self.opt.totemBarShowWater ~= false then visibleCount = visibleCount + 1 end
-	if self.opt.totemBarShowAir ~= false then visibleCount = visibleCount + 1 end
+	if self.opt.totemBarShowEarth ~= false and not self:IsElementPoppedOut(1) then visibleCount = visibleCount + 1 end
+	if self.opt.totemBarShowFire ~= false and not self:IsElementPoppedOut(2) then visibleCount = visibleCount + 1 end
+	if self.opt.totemBarShowWater ~= false and not self:IsElementPoppedOut(3) then visibleCount = visibleCount + 1 end
+	if self.opt.totemBarShowAir ~= false and not self:IsElementPoppedOut(4) then visibleCount = visibleCount + 1 end
 
 	local baseSize = (buttonSize * visibleCount) + (spacing * math.max(0, visibleCount - 1))
 
@@ -7063,6 +8727,7 @@ ShamanPower.dropAllCurrentElement = 1  -- Start with Earth
 ShamanPower.dropAllSequence = {}  -- Ordered list of {element, spellName, icon}
 ShamanPower.dropAllInCombat = false  -- Track if we were in combat
 ShamanPower.dropAllLastMacro = ""  -- Track last macro to avoid unnecessary rebuilds
+ShamanPower.dropAllMiddleClickHooked = false  -- Track if we've hooked middle-click
 
 -- Build the totem sequence and update the Drop All button
 function ShamanPower:UpdateDropAllButton()
@@ -7075,6 +8740,47 @@ function ShamanPower:UpdateDropAllButton()
 	self.dropAllInCombat = inCombat
 	local dropAllBtn = _G["ShamanPowerAutoDropAll"]
 	if not dropAllBtn then return end
+
+	-- One-time setup: Add middle-click handler for pop-out (or return/settings if already popped)
+	if not self.dropAllMiddleClickHooked then
+		self.dropAllMiddleClickHooked = true
+		dropAllBtn:HookScript("OnClick", function(self, button)
+			if button == "MiddleButton" then
+				-- Debounce
+				local now = GetTime()
+				if ShamanPower.lastDropAllPopOutTime and (now - ShamanPower.lastDropAllPopOutTime) < 0.3 then
+					return
+				end
+				ShamanPower.lastDropAllPopOutTime = now
+
+				local key = "dropall"
+				if ShamanPower.opt.poppedOut and ShamanPower.opt.poppedOut[key] then
+					-- Already popped out
+					if IsShiftKeyDown() then
+						-- SHIFT+middle-click opens settings
+						local frame = ShamanPower.poppedOutFrames[key]
+						if frame then
+							ShamanPower:ShowPopOutSettingsPanel(key, frame)
+						end
+					else
+						-- Plain middle-click returns to bar
+						if InCombatLockdown() then
+							print("|cffff0000ShamanPower:|r Cannot modify pop-outs during combat")
+							return
+						end
+						ShamanPower:ReturnPopOutToBar(key)
+					end
+				else
+					-- Not popped out, so pop it out
+					if InCombatLockdown() then
+						print("|cffff0000ShamanPower:|r Cannot pop out during combat")
+						return
+					end
+					ShamanPower:PopOutDropAll()
+				end
+			end
+		end)
+	end
 
 	local playerName = self.player
 	local assignments = ShamanPower_Assignments[playerName]
@@ -7816,6 +9522,11 @@ function ShamanPower:PLAYER_ENTERING_WORLD()
 	-- Initialize Earth Shield Tracker (for tracking all ES in raid/party)
 	C_Timer.After(2, function()
 		self:InitializeESTracker()
+	end)
+
+	-- Restore popped-out trackers after bars are fully initialized
+	C_Timer.After(2.5, function()
+		self:RestorePoppedOutTrackers()
 	end)
 end
 

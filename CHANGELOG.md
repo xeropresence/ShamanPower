@@ -2,6 +2,15 @@
 
 ## [v1.3.7-beta](https://github.com/taubut/ShamanPower/releases/tag/v1.3.7-beta) (2026-01-22)
 
+### Pop-Out Individual Trackers
+- Middle-click any button to pop it out as a standalone, movable tracker
+- Supports: Individual totems (from flyout), entire element with flyout, cooldown bar items, Earth Shield, Drop All
+- SHIFT+Middle-click on popped-out frame to open settings (scale, opacity, hide frame)
+- ALT+drag to move popped-out frames
+- Popped-out elements with flyouts can have custom flyout direction (Top/Bottom/Left/Right)
+- Pop-out state and positions save per-profile and persist across /reload
+- Main bar reflows when items are popped out
+
 ### Duration Bar Improvements
 - Add duration bar position options: Left, Right, Top (Horizontal), Top (Vertical), Bottom (Horizontal), Bottom (Vertical)
 - Add duration bar size slider for both totem bar and cooldown bar
