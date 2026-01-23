@@ -1,5 +1,43 @@
 # ShamanPower Changelog
 
+## [v1.3.9](https://github.com/taubut/ShamanPower/releases/tag/v1.3.9) (2026-01-23)
+
+### New Features
+- **Party Buff Tracker**: Shows number of players in range per totem element as numbers
+  - Display on icon or as separate movable frames
+  - Element colors (Earth=green, Fire=red, Water=blue, Air=white)
+  - Scale, opacity, lock, font size options
+- **Full Opacity When Active**: Option for totem bar and cooldown bar to show at full opacity when totems are placed or cooldowns are active
+
+### Duration Bar Enhancements
+- Add "None" position option to disable duration bar completely
+- Add duration text size option (6-20)
+- Increase max bar size to 26 (full icon width)
+- Fix bottom vertical direction to shrink toward icon (was shrinking away)
+
+### Pulse Bar Enhancements
+- Add "None" position option to disable pulse bar
+- Add pulse bar size option (was hardcoded to 4)
+- Add pulse text size option (6-20)
+- Increase max bar size to 26 (full icon width)
+- Fix vertical positions (above_vert, below_vert) to respect size setting
+
+### Cooldown Bar Fixes
+- Reduce cooldown text size (was too big for icon)
+- Flyout menus now go opposite direction when bar is locked to totem bar
+
+### Range Tracker Fixes
+- Fix Windfury range tracking to check active totem, not assigned totem
+- Windfury dots now only show for players with ShamanPower installed
+- Hide dots for totems without trackable buffs (Tremor, Searing, Earthbind, etc.)
+
+### Performance
+- Throttle pulse tracking OnUpdate to 20fps (reduces CPU usage)
+- Throttle twist timer tracking OnUpdate to 20fps
+
+### Bug Fixes
+- Fix "Allow custom scripts?" warning when right-clicking totems (now uses Totemic Call)
+
 ## [v1.3.8](https://github.com/taubut/ShamanPower/releases/tag/v1.3.8) (2026-01-22)
 
 ### New Features
