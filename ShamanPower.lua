@@ -3920,10 +3920,9 @@ function ShamanPower:PopOutSingleTotem(element, totemIndex)
 		btn:SetAttribute("spell1", spellName)
 	end
 
-	-- Right-click to destroy totem
-	local slot = self.ElementToSlot and self.ElementToSlot[element] or element
-	btn:SetAttribute("type2", "macro")
-	btn:SetAttribute("macrotext2", "/run DestroyTotem(" .. slot .. ")")
+	-- Right-click to cast Totemic Call (destroys all totems)
+	btn:SetAttribute("type2", "spell")
+	btn:SetAttribute("spell2", GetSpellInfo(36936))  -- Totemic Call
 
 	-- Tooltip
 	btn:SetScript("OnEnter", function(self)
@@ -4601,10 +4600,9 @@ function ShamanPower:CreateTotemButtons()
 		-- Spell casting (type1 = left click)
 		btn:SetAttribute("type1", "spell")
 
-		-- Destroy totem (type2 = right click)
-		local slot = self.ElementToSlot and self.ElementToSlot[element] or element
-		btn:SetAttribute("type2", "macro")
-		btn:SetAttribute("macrotext2", "/run DestroyTotem(" .. slot .. ")")
+		-- Right-click to cast Totemic Call (destroys all totems)
+		btn:SetAttribute("type2", "spell")
+		btn:SetAttribute("spell2", GetSpellInfo(36936))  -- Totemic Call
 
 		-- Register for clicks
 		btn:RegisterForClicks("AnyUp", "AnyDown")
@@ -4793,10 +4791,9 @@ function ShamanPower:UpdateTotemButtons()
 				btn:SetAttribute("spell1", spellName)
 			end
 
-			-- Right-click to destroy totem
-			local slot = self.ElementToSlot[element]
-			btn:SetAttribute("type2", "macro")
-			btn:SetAttribute("macrotext2", "/run DestroyTotem(" .. slot .. ")")
+			-- Right-click to cast Totemic Call (destroys all totems)
+			btn:SetAttribute("type2", "spell")
+			btn:SetAttribute("spell2", GetSpellInfo(36936))  -- Totemic Call
 
 			-- Handle visibility and positioning (only for non-popped-out elements)
 			if not elementVisible[element] then
@@ -7862,7 +7859,7 @@ function ShamanPower:UpdateMiniTotemBar()
 					totemButton:SetPoint("TOPLEFT", self.autoButton, "TOPLEFT", padding, -padding - (visiblePosition - 1) * (buttonSize + spacing))
 				end
 
-				-- Set up the button: left-click casts totem, right-click destroys it
+				-- Set up the button: left-click casts totem, right-click casts Totemic Call
 				totemButton:RegisterForClicks("AnyUp", "AnyDown")
 
 				-- Clear old attributes first
@@ -7889,10 +7886,9 @@ function ShamanPower:UpdateMiniTotemBar()
 					totemButton:SetAttribute("spell1", spellName)
 				end
 
-				-- Right-click: destroy totem (using macro to call DestroyTotem)
-				local slot = self.ElementToSlot[element]
-				totemButton:SetAttribute("type2", "macro")
-				totemButton:SetAttribute("macrotext2", "/run DestroyTotem(" .. slot .. ")")
+				-- Right-click to cast Totemic Call (destroys all totems)
+				totemButton:SetAttribute("type2", "spell")
+				totemButton:SetAttribute("spell2", GetSpellInfo(36936))  -- Totemic Call
 			end  -- end of else (visible)
 		end  -- end of if totemButton
 	end  -- end of for loop
@@ -8073,7 +8069,8 @@ function ShamanPower:TotemBarTooltip(button, element)
 	GameTooltip:AddLine(elementName .. " Totem", 1, 1, 1)
 	if spellID then
 		GameTooltip:AddLine(totemName, 0, 1, 0)
-		GameTooltip:AddLine("Click to cast", 0.7, 0.7, 0.7)
+		GameTooltip:AddLine("|cff00ff00Left-click:|r Cast totem", 0.7, 0.7, 0.7)
+		GameTooltip:AddLine("|cffffcc00Right-click:|r Totemic Call", 0.7, 0.7, 0.7)
 	else
 		GameTooltip:AddLine("No totem assigned", 1, 0, 0)
 	end
