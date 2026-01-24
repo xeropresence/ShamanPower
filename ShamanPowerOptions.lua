@@ -2021,22 +2021,25 @@ ShamanPower.options = {
 							order = 11,
 							type = "execute",
 							name = "Reset Frame Positions",
-							desc = "Reset unlocked counter frames to default positions",
+							desc = "Reset unlocked counter frames to center of screen",
 							hidden = function()
 								return not (ShamanPower.opt.rangeCounter and ShamanPower.opt.rangeCounter.enabled)
 									or (ShamanPower.opt.rangeCounter and ShamanPower.opt.rangeCounter.location ~= "unlocked")
 							end,
 							func = function()
+								-- Clear saved positions
 								if ShamanPower.opt.rangeCounter then
 									ShamanPower.opt.rangeCounter.positions = {}
 								end
+								-- Reposition existing frames to center of screen
 								for element = 1, 4 do
-									if ShamanPower.rangeCounterFrames[element] then
-										ShamanPower.rangeCounterFrames[element]:Hide()
-										ShamanPower.rangeCounterFrames[element] = nil
+									local frame = ShamanPower.rangeCounterFrames[element]
+									if frame then
+										local xOffset = (element - 2.5) * 55  -- Spread horizontally
+										frame:ClearAllPoints()
+										frame:SetPoint("CENTER", UIParent, "CENTER", xOffset, 0)
 									end
 								end
-								ShamanPower:UpdateRangeCounters()
 							end
 						},
 					}

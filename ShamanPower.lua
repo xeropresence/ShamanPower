@@ -2475,7 +2475,10 @@ end
 
 -- Update all party range dots
 function ShamanPower:UpdatePartyRangeDots()
-	-- Check if feature is enabled
+	-- Always update range counters (even if dots are disabled)
+	self:UpdateRangeCounters()
+
+	-- Check if dots feature is enabled
 	if not self.opt.showPartyRangeDots then
 		-- Hide all dots when disabled
 		for element = 1, 4 do
@@ -2618,9 +2621,6 @@ function ShamanPower:UpdatePartyRangeDots()
 			end
 		end
 	end
-
-	-- Update range counters after updating dots
-	self:UpdateRangeCounters()
 end
 
 -- ============================================================================
@@ -2701,26 +2701,10 @@ function ShamanPower:CreateRangeCounterFrame(element)
 		local pos = rcOpt.positions[element]
 		frame:SetPoint(pos.point or "CENTER", UIParent, pos.relPoint or "CENTER", pos.x or 0, pos.y or 0)
 	else
-		-- Default position: above the totem bar, matching totem button positions
-		-- Always use CENTER anchor so scaling works properly
-		local totemBtn = self.totemButtons and self.totemButtons[element]
-		if totemBtn and totemBtn:GetCenter() then
-			-- Get totem button's screen position and place frame above it
-			local btnX, btnY = totemBtn:GetCenter()
-			local btnTop = btnY + (totemBtn:GetHeight() / 2)
-			local frameHeight = frame:GetHeight() or 40
-			-- Calculate center position (above totem button)
-			local centerY = btnTop + 5 + (frameHeight / 2)
-			-- Convert to offset from screen center
-			local screenWidth, screenHeight = UIParent:GetWidth(), UIParent:GetHeight()
-			local offsetX = btnX - (screenWidth / 2)
-			local offsetY = centerY - (screenHeight / 2)
-			frame:SetPoint("CENTER", UIParent, "CENTER", offsetX, offsetY)
-		else
-			-- Fallback: spread horizontally near center of screen
-			local xOffset = (element - 2.5) * 55
-			frame:SetPoint("CENTER", UIParent, "CENTER", xOffset, 0)
-		end
+		-- Default position: spread horizontally near center of screen
+		-- Element 1=Earth, 2=Fire, 3=Water, 4=Air -> spread from left to right
+		local xOffset = (element - 2.5) * 55  -- -82.5, -27.5, 27.5, 82.5
+		frame:SetPoint("CENTER", UIParent, "CENTER", xOffset, 0)
 	end
 
 	-- Apply scale and opacity
@@ -2920,6 +2904,7 @@ function ShamanPower:UpdateRangeCounters()
 		local inRangeCount = 0
 		local slot = self.ElementToSlot[element]
 		local haveTotem = slot and GetTotemInfo(slot)
+		local hasTrackableBuff = false  -- Track if this totem can be tracked
 
 		if haveTotem and totalPartyMembers > 0 then
 			local buffName = self:GetActiveTotemBuffName(element)
@@ -2929,17 +2914,21 @@ function ShamanPower:UpdateRangeCounters()
 					-- Special case: Air element with Windfury
 					local isWindfury = (element == 4 and not buffName)
 					if isWindfury then
+						hasTrackableBuff = true  -- Windfury is trackable via broadcast
 						local playerName = UnitName(unit)
 						local wfStatus = self:IsPlayerInWindfuryRange(playerName)
 						if wfStatus == true then
 							inRangeCount = inRangeCount + 1
 						end
 					elseif buffName then
+						hasTrackableBuff = true  -- Has a trackable buff
 						local hasBuff = self:UnitHasBuff(unit, buffName)
 						if hasBuff then
 							inRangeCount = inRangeCount + 1
 						end
 					end
+					-- If no buffName and not Windfury, hasTrackableBuff stays false
+					-- (e.g., Tremor, Searing, Disease Cleansing, Earthbind, etc.)
 				end
 			end
 		end
@@ -2972,12 +2961,12 @@ function ShamanPower:UpdateRangeCounters()
 				-- Unlocked frames: always show all 4 frames when in a party
 				counterFrame:Show()
 
-				if haveTotem then
-					-- Totem is active - show the count
+				if haveTotem and hasTrackableBuff then
+					-- Totem is active and has trackable buff - show the count
 					counterText:SetText(tostring(inRangeCount))
 					counterText:Show()
 				else
-					-- No totem - show nothing
+					-- No totem or totem has no trackable buff - show nothing
 					counterText:SetText("")
 					counterText:Hide()
 				end
@@ -2994,8 +2983,8 @@ function ShamanPower:UpdateRangeCounters()
 				local fontSize = rcOpt.fontSize or 14
 				counterText:SetFont("Fonts\\FRIZQT__.TTF", fontSize, "OUTLINE")
 
-			elseif not useUnlocked and haveTotem and totalPartyMembers > 0 then
-				-- On-icon mode: only show when totem is active
+			elseif not useUnlocked and haveTotem and hasTrackableBuff and totalPartyMembers > 0 then
+				-- On-icon mode: only show when totem is active and has trackable buff
 				counterText:SetText(tostring(inRangeCount))
 
 				-- Set color
@@ -3012,7 +3001,7 @@ function ShamanPower:UpdateRangeCounters()
 
 				counterText:Show()
 			else
-				-- No totem (on-icon mode) or no party - hide
+				-- No totem, no trackable buff, or no party - hide
 				counterText:Hide()
 				if useUnlocked and counterFrame then
 					counterFrame:Hide()

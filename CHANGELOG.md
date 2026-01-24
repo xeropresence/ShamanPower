@@ -1,5 +1,13 @@
 # ShamanPower Changelog
 
+## [v1.4.0](https://github.com/taubut/ShamanPower/releases/tag/v1.4.0) (2026-01-23)
+
+### Party Buff Tracker Fixes
+- Fix numbers not updating when display mode set to "Numbers Only" (was only updating when dots enabled)
+- Default frame position now centers on screen instead of above totem bar
+- Reset Frame Positions button now centers all frames on screen
+- Hide numbers for totems without trackable buffs (Tremor, Searing, Disease Cleansing, Earthbind, etc.) instead of showing 0
+
 ## [v1.3.9](https://github.com/taubut/ShamanPower/releases/tag/v1.3.9) (2026-01-23)
 
 ### New Features
