@@ -142,7 +142,7 @@ SHAMANPOWER_DEFAULT_VALUES = {
         totemBarShowAir = true,    -- Show Air totem button on mini bar
         totemBarShowEarthShield = true,  -- Show Earth Shield button on mini bar
         enableESFlyout = false,  -- Enable Earth Shield flyout menu (disabled by default for performance)
-        cooldownBarOrder = {1, 2, 3, 4, 5, 6, 7},  -- Order of cooldown bar items: 1=Shield, 2=Recall, 3=Ankh, 4=NS, 5=ManaTide, 6=BL/Hero, 7=Imbues
+        cooldownBarOrder = {1, 2, 3, 4, 5, 6, 7, 8},  -- Order of cooldown bar items: 1=Shield, 2=Recall, 3=Ankh, 4=NS, 5=ManaTide, 6=ShamanisticRage, 7=BL/Hero, 8=Imbues
         -- Pop-out tracker settings
         -- Keys: "totem_earth", "totem_fire", "totem_water", "totem_air" (element with flyout)
         --       "single_1_3" (element 1, totem index 3 = Tremor Totem)
@@ -219,6 +219,25 @@ SHAMANPOWER_DEFAULT_VALUES = {
             vertical = false,
             hideNames = false,
             hideBorder = false,
+        },
+        -- Totem Plates (replace totem nameplates with icons)
+        totemPlates = {
+            enabled = false,
+            showEnemy = true,
+            showFriendly = true,
+            iconSize = 40,
+            alpha = 0.9,
+            showName = false,
+            borderStyle = "rounded",
+            -- Pulse timer settings
+            showPulseTimer = true,      -- Master toggle for pulse timers
+            showPulseText = true,       -- Show countdown text on icon
+            showPulseBar = true,        -- Show progress bar at bottom
+            showPulseCooldown = false,  -- Show cooldown swipe animation
+            pulseTextSize = 14,         -- Font size for pulse countdown text
+            pulseBarHeight = 4,         -- Height of the pulse progress bar
+            -- Per-totem settings (all enabled by default)
+            perTotem = {},
         },
     }
 }

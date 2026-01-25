@@ -2,6 +2,16 @@
 
 ## [v1.5.1](https://github.com/taubut/ShamanPower/releases/tag/v1.5.1) (2026-01-25)
 
+### Memory Optimizations
+- **Cooldown bar shield detection**: Switched from polling to event-driven approach using UNIT_AURA
+  - Reduced memory allocation from ~12 KB/call to near 0
+  - Shield state now cached and only rescanned when auras change
+- **Player totem range checking**: Optimized to scan player buffs once per update tick
+  - Checks all 4 totem elements in a single buff scan instead of 4 separate scans
+  - Reduced memory allocation from ~6 KB/call to near 0
+- **Party range UnitHasBuff**: Simplified to match TotemTimers' approach (direct scan, direct comparison)
+- **Removed tracking overhead**: Cleaned up all memory profiling code that was adding overhead
+
 ### UI Improvements
 - **Earth Shield full opacity when active**: ES button now respects the "Full Opacity When Totem Placed" setting
 - **Section descriptions**: Added helpful descriptions to all Look & Feel option sections explaining what each section controls

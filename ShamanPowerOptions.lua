@@ -1431,7 +1431,7 @@ ShamanPower.options = {
 					}
 				},
 				cooldown_display_section = {
-					order = 7,
+					order = 11,
 					name = "Cooldown Display",
 					type = "group",
 					hidden = function(info)
@@ -1563,7 +1563,7 @@ ShamanPower.options = {
 					}
 				},
 				color_section = {
-					order = 8,
+					order = 19,
 					name = "Status Colors",
 					type = "group",
 					disabled = function(info)
@@ -1627,7 +1627,7 @@ ShamanPower.options = {
 					}
 				},
 				raid_cd_section = {
-					order = 9,
+					order = 18,
 					name = "Raid Cooldowns",
 					type = "group",
 					args = {
@@ -1725,7 +1725,7 @@ ShamanPower.options = {
 					}
 				},
 				sprange_section = {
-					order = 10,
+					order = 15,
 					name = "Totem Range Tracker",
 					type = "group",
 					args = {
@@ -1819,7 +1819,7 @@ ShamanPower.options = {
 					}
 				},
 				partybuff_section = {
-					order = 10.5,
+					order = 14,
 					name = "Party Buff Tracker",
 					type = "group",
 					args = {
@@ -2095,7 +2095,7 @@ ShamanPower.options = {
 					}
 				},
 				estrack_section = {
-					order = 11,
+					order = 16,
 					name = "Earth Shield Tracker",
 					type = "group",
 					args = {
@@ -2224,7 +2224,7 @@ ShamanPower.options = {
 					}
 				},
 				shieldcharges_section = {
-					order = 12,
+					order = 17,
 					name = "Shield Charge Display",
 					type = "group",
 					args = {
@@ -2354,7 +2354,7 @@ ShamanPower.options = {
 					}
 				},
 				totembar_items_section = {
-					order = 13,
+					order = 7,
 					name = "Totem Bar Items",
 					type = "group",
 					args = {
@@ -2436,7 +2436,7 @@ ShamanPower.options = {
 					}
 				},
 				totembar_order_section = {
-					order = 14,
+					order = 8,
 					name = "Totem Bar Order",
 					type = "group",
 					args = {
@@ -2556,7 +2556,7 @@ ShamanPower.options = {
 					}
 				},
 				totembar_duration_section = {
-					order = 15,
+					order = 9,
 					name = "Totem Duration Bars",
 					type = "group",
 					args = {
@@ -2742,7 +2742,7 @@ ShamanPower.options = {
 					}
 				},
 				cdbar_items_section = {
-					order = 16,
+					order = 12,
 					name = "Cooldown Bar Items",
 					type = "group",
 					args = {
@@ -2860,6 +2860,25 @@ ShamanPower.options = {
 								end
 							end
 						},
+						cdbar_show_shamanistic_rage = {
+							order = 5.5,
+							type = "toggle",
+							name = "Sham Rage",
+							desc = "Show Shamanistic Rage cooldown on cooldown bar (Enhancement talent)",
+							width = 0.65,
+							hidden = function(info)
+								return not ShamanPower.opt.showCooldownBar
+							end,
+							get = function(info)
+								return ShamanPower.opt.cdbarShowShamanisticRage ~= false
+							end,
+							set = function(info, val)
+								ShamanPower.opt.cdbarShowShamanisticRage = val
+								if not InCombatLockdown() then
+									ShamanPower:RecreateCooldownBar()
+								end
+							end
+						},
 						cdbar_show_bloodlust = {
 							order = 6,
 							type = "toggle",
@@ -2901,7 +2920,7 @@ ShamanPower.options = {
 					}
 				},
 				cdbar_order_section = {
-					order = 17,
+					order = 13,
 					name = "Cooldown Bar Order",
 					type = "group",
 					hidden = function(info)
@@ -2925,15 +2944,16 @@ ShamanPower.options = {
 								[3] = "Reincarnation",
 								[4] = "Nature's Swiftness",
 								[5] = "Mana Tide Totem",
-								[6] = "Bloodlust/Heroism",
-								[7] = "Weapon Imbue",
+								[6] = "Shamanistic Rage",
+								[7] = "Bloodlust/Heroism",
+								[8] = "Weapon Imbue",
 							},
 							get = function(info)
 								return ShamanPower.opt.cooldownBarOrder and ShamanPower.opt.cooldownBarOrder[1] or 1
 							end,
 							set = function(info, val)
-								if not ShamanPower.opt.cooldownBarOrder then ShamanPower.opt.cooldownBarOrder = {1, 2, 3, 4, 5, 6, 7} end
-								for i = 2, 7 do
+								if not ShamanPower.opt.cooldownBarOrder then ShamanPower.opt.cooldownBarOrder = {1, 2, 3, 4, 5, 6, 7, 8} end
+								for i = 2, 8 do
 									if ShamanPower.opt.cooldownBarOrder[i] == val then
 										ShamanPower.opt.cooldownBarOrder[i] = ShamanPower.opt.cooldownBarOrder[1]
 										break
@@ -2955,15 +2975,16 @@ ShamanPower.options = {
 								[3] = "Reincarnation",
 								[4] = "Nature's Swiftness",
 								[5] = "Mana Tide Totem",
-								[6] = "Bloodlust/Heroism",
-								[7] = "Weapon Imbue",
+								[6] = "Shamanistic Rage",
+								[7] = "Bloodlust/Heroism",
+								[8] = "Weapon Imbue",
 							},
 							get = function(info)
 								return ShamanPower.opt.cooldownBarOrder and ShamanPower.opt.cooldownBarOrder[2] or 2
 							end,
 							set = function(info, val)
-								if not ShamanPower.opt.cooldownBarOrder then ShamanPower.opt.cooldownBarOrder = {1, 2, 3, 4, 5, 6, 7} end
-								for i = 1, 7 do
+								if not ShamanPower.opt.cooldownBarOrder then ShamanPower.opt.cooldownBarOrder = {1, 2, 3, 4, 5, 6, 7, 8} end
+								for i = 1, 8 do
 									if i ~= 2 and ShamanPower.opt.cooldownBarOrder[i] == val then
 										ShamanPower.opt.cooldownBarOrder[i] = ShamanPower.opt.cooldownBarOrder[2]
 										break
@@ -2985,15 +3006,16 @@ ShamanPower.options = {
 								[3] = "Reincarnation",
 								[4] = "Nature's Swiftness",
 								[5] = "Mana Tide Totem",
-								[6] = "Bloodlust/Heroism",
-								[7] = "Weapon Imbue",
+								[6] = "Shamanistic Rage",
+								[7] = "Bloodlust/Heroism",
+								[8] = "Weapon Imbue",
 							},
 							get = function(info)
 								return ShamanPower.opt.cooldownBarOrder and ShamanPower.opt.cooldownBarOrder[3] or 3
 							end,
 							set = function(info, val)
-								if not ShamanPower.opt.cooldownBarOrder then ShamanPower.opt.cooldownBarOrder = {1, 2, 3, 4, 5, 6, 7} end
-								for i = 1, 7 do
+								if not ShamanPower.opt.cooldownBarOrder then ShamanPower.opt.cooldownBarOrder = {1, 2, 3, 4, 5, 6, 7, 8} end
+								for i = 1, 8 do
 									if i ~= 3 and ShamanPower.opt.cooldownBarOrder[i] == val then
 										ShamanPower.opt.cooldownBarOrder[i] = ShamanPower.opt.cooldownBarOrder[3]
 										break
@@ -3015,15 +3037,16 @@ ShamanPower.options = {
 								[3] = "Reincarnation",
 								[4] = "Nature's Swiftness",
 								[5] = "Mana Tide Totem",
-								[6] = "Bloodlust/Heroism",
-								[7] = "Weapon Imbue",
+								[6] = "Shamanistic Rage",
+								[7] = "Bloodlust/Heroism",
+								[8] = "Weapon Imbue",
 							},
 							get = function(info)
 								return ShamanPower.opt.cooldownBarOrder and ShamanPower.opt.cooldownBarOrder[4] or 4
 							end,
 							set = function(info, val)
-								if not ShamanPower.opt.cooldownBarOrder then ShamanPower.opt.cooldownBarOrder = {1, 2, 3, 4, 5, 6, 7} end
-								for i = 1, 7 do
+								if not ShamanPower.opt.cooldownBarOrder then ShamanPower.opt.cooldownBarOrder = {1, 2, 3, 4, 5, 6, 7, 8} end
+								for i = 1, 8 do
 									if i ~= 4 and ShamanPower.opt.cooldownBarOrder[i] == val then
 										ShamanPower.opt.cooldownBarOrder[i] = ShamanPower.opt.cooldownBarOrder[4]
 										break
@@ -3045,15 +3068,16 @@ ShamanPower.options = {
 								[3] = "Reincarnation",
 								[4] = "Nature's Swiftness",
 								[5] = "Mana Tide Totem",
-								[6] = "Bloodlust/Heroism",
-								[7] = "Weapon Imbue",
+								[6] = "Shamanistic Rage",
+								[7] = "Bloodlust/Heroism",
+								[8] = "Weapon Imbue",
 							},
 							get = function(info)
 								return ShamanPower.opt.cooldownBarOrder and ShamanPower.opt.cooldownBarOrder[5] or 5
 							end,
 							set = function(info, val)
-								if not ShamanPower.opt.cooldownBarOrder then ShamanPower.opt.cooldownBarOrder = {1, 2, 3, 4, 5, 6, 7} end
-								for i = 1, 7 do
+								if not ShamanPower.opt.cooldownBarOrder then ShamanPower.opt.cooldownBarOrder = {1, 2, 3, 4, 5, 6, 7, 8} end
+								for i = 1, 8 do
 									if i ~= 5 and ShamanPower.opt.cooldownBarOrder[i] == val then
 										ShamanPower.opt.cooldownBarOrder[i] = ShamanPower.opt.cooldownBarOrder[5]
 										break
@@ -3075,15 +3099,16 @@ ShamanPower.options = {
 								[3] = "Reincarnation",
 								[4] = "Nature's Swiftness",
 								[5] = "Mana Tide Totem",
-								[6] = "Bloodlust/Heroism",
-								[7] = "Weapon Imbue",
+								[6] = "Shamanistic Rage",
+								[7] = "Bloodlust/Heroism",
+								[8] = "Weapon Imbue",
 							},
 							get = function(info)
 								return ShamanPower.opt.cooldownBarOrder and ShamanPower.opt.cooldownBarOrder[6] or 6
 							end,
 							set = function(info, val)
-								if not ShamanPower.opt.cooldownBarOrder then ShamanPower.opt.cooldownBarOrder = {1, 2, 3, 4, 5, 6, 7} end
-								for i = 1, 7 do
+								if not ShamanPower.opt.cooldownBarOrder then ShamanPower.opt.cooldownBarOrder = {1, 2, 3, 4, 5, 6, 7, 8} end
+								for i = 1, 8 do
 									if i ~= 6 and ShamanPower.opt.cooldownBarOrder[i] == val then
 										ShamanPower.opt.cooldownBarOrder[i] = ShamanPower.opt.cooldownBarOrder[6]
 										break
@@ -3105,16 +3130,17 @@ ShamanPower.options = {
 								[3] = "Reincarnation",
 								[4] = "Nature's Swiftness",
 								[5] = "Mana Tide Totem",
-								[6] = "Bloodlust/Heroism",
-								[7] = "Weapon Imbue",
+								[6] = "Shamanistic Rage",
+								[7] = "Bloodlust/Heroism",
+								[8] = "Weapon Imbue",
 							},
 							get = function(info)
 								return ShamanPower.opt.cooldownBarOrder and ShamanPower.opt.cooldownBarOrder[7] or 7
 							end,
 							set = function(info, val)
-								if not ShamanPower.opt.cooldownBarOrder then ShamanPower.opt.cooldownBarOrder = {1, 2, 3, 4, 5, 6, 7} end
-								for i = 1, 6 do
-									if ShamanPower.opt.cooldownBarOrder[i] == val then
+								if not ShamanPower.opt.cooldownBarOrder then ShamanPower.opt.cooldownBarOrder = {1, 2, 3, 4, 5, 6, 7, 8} end
+								for i = 1, 8 do
+									if i ~= 7 and ShamanPower.opt.cooldownBarOrder[i] == val then
 										ShamanPower.opt.cooldownBarOrder[i] = ShamanPower.opt.cooldownBarOrder[7]
 										break
 									end
@@ -3123,10 +3149,41 @@ ShamanPower.options = {
 								if not InCombatLockdown() then ShamanPower:RecreateCooldownBar() end
 							end
 						},
+						cooldown_bar_order_8 = {
+							order = 8,
+							type = "select",
+							name = "8th Position",
+							desc = "Eighth cooldown button position",
+							width = 1.5,
+							values = {
+								[1] = "Shield",
+								[2] = "Totemic Call",
+								[3] = "Reincarnation",
+								[4] = "Nature's Swiftness",
+								[5] = "Mana Tide Totem",
+								[6] = "Shamanistic Rage",
+								[7] = "Bloodlust/Heroism",
+								[8] = "Weapon Imbue",
+							},
+							get = function(info)
+								return ShamanPower.opt.cooldownBarOrder and ShamanPower.opt.cooldownBarOrder[8] or 8
+							end,
+							set = function(info, val)
+								if not ShamanPower.opt.cooldownBarOrder then ShamanPower.opt.cooldownBarOrder = {1, 2, 3, 4, 5, 6, 7, 8} end
+								for i = 1, 8 do
+									if i ~= 8 and ShamanPower.opt.cooldownBarOrder[i] == val then
+										ShamanPower.opt.cooldownBarOrder[i] = ShamanPower.opt.cooldownBarOrder[8]
+										break
+									end
+								end
+								ShamanPower.opt.cooldownBarOrder[8] = val
+								if not InCombatLockdown() then ShamanPower:RecreateCooldownBar() end
+							end
+						},
 					}
 				},
 				popout_section = {
-					order = 18,
+					order = 20,
 					name = "Pop-Out Trackers",
 					type = "group",
 					args = {
@@ -3170,6 +3227,216 @@ ShamanPower.options = {
 									end
 								end
 							end,
+						},
+					}
+				},
+				totemplates_section = {
+					order = 10,
+					name = "Totem Plates",
+					type = "group",
+					args = {
+						totemplates_desc = {
+							order = 0,
+							type = "description",
+							name = "Replace totem nameplates with icons for easy identification in PvP and raids.\n\n|cffff8800Note:|r Requires the |cff00ff00ShamanPower [Totem Plates]|r module to be enabled in your AddOns list.\n",
+						},
+						totemplates_enabled = {
+							order = 1,
+							name = "Enable Totem Plates",
+							desc = "Replace totem nameplates with clean icons",
+							type = "toggle",
+							width = "full",
+							get = function(info)
+								return ShamanPower.opt.totemPlates and ShamanPower.opt.totemPlates.enabled or false
+							end,
+							set = function(info, val)
+								ShamanPower:EnsureProfileTable("totemPlates")
+								ShamanPower.opt.totemPlates.enabled = val
+								ShamanPower:ToggleTotemPlates()
+							end
+						},
+						totemplates_show_enemy = {
+							order = 2,
+							name = "Show Enemy Totems",
+							desc = "Replace enemy totem nameplates with icons",
+							type = "toggle",
+							width = 1.0,
+							disabled = function() return not (ShamanPower.opt.totemPlates and ShamanPower.opt.totemPlates.enabled) end,
+							get = function(info)
+								return ShamanPower.opt.totemPlates and ShamanPower.opt.totemPlates.showEnemy ~= false
+							end,
+							set = function(info, val)
+								ShamanPower:EnsureProfileTable("totemPlates")
+								ShamanPower.opt.totemPlates.showEnemy = val
+							end
+						},
+						totemplates_show_friendly = {
+							order = 3,
+							name = "Show Friendly Totems",
+							desc = "Replace friendly totem nameplates with icons",
+							type = "toggle",
+							width = 1.0,
+							disabled = function() return not (ShamanPower.opt.totemPlates and ShamanPower.opt.totemPlates.enabled) end,
+							get = function(info)
+								return ShamanPower.opt.totemPlates and ShamanPower.opt.totemPlates.showFriendly ~= false
+							end,
+							set = function(info, val)
+								ShamanPower:EnsureProfileTable("totemPlates")
+								ShamanPower.opt.totemPlates.showFriendly = val
+							end
+						},
+						totemplates_size = {
+							order = 4,
+							name = "Icon Size",
+							desc = "Size of the totem plate icons",
+							type = "range",
+							min = 20, max = 80, step = 2,
+							width = 1.5,
+							disabled = function() return not (ShamanPower.opt.totemPlates and ShamanPower.opt.totemPlates.enabled) end,
+							get = function(info)
+								return ShamanPower.opt.totemPlates and ShamanPower.opt.totemPlates.iconSize or 40
+							end,
+							set = function(info, val)
+								ShamanPower:EnsureProfileTable("totemPlates")
+								ShamanPower.opt.totemPlates.iconSize = val
+								ShamanPower:UpdateTotemPlatesSize()
+							end
+						},
+						totemplates_alpha = {
+							order = 5,
+							name = "Opacity",
+							desc = "Opacity of the totem plate icons",
+							type = "range",
+							min = 0.3, max = 1.0, step = 0.1,
+							isPercent = true,
+							width = 1.5,
+							disabled = function() return not (ShamanPower.opt.totemPlates and ShamanPower.opt.totemPlates.enabled) end,
+							get = function(info)
+								return ShamanPower.opt.totemPlates and ShamanPower.opt.totemPlates.alpha or 0.9
+							end,
+							set = function(info, val)
+								ShamanPower:EnsureProfileTable("totemPlates")
+								ShamanPower.opt.totemPlates.alpha = val
+							end
+						},
+						totemplates_show_name = {
+							order = 6,
+							name = "Show Totem Name",
+							desc = "Display the totem name below the icon",
+							type = "toggle",
+							width = "full",
+							disabled = function() return not (ShamanPower.opt.totemPlates and ShamanPower.opt.totemPlates.enabled) end,
+							get = function(info)
+								return ShamanPower.opt.totemPlates and ShamanPower.opt.totemPlates.showName or false
+							end,
+							set = function(info, val)
+								ShamanPower:EnsureProfileTable("totemPlates")
+								ShamanPower.opt.totemPlates.showName = val
+							end
+						},
+						totemplates_pulse_header = {
+							order = 7,
+							type = "header",
+							name = "Pulse Timer",
+							hidden = function() return not (ShamanPower.opt.totemPlates and ShamanPower.opt.totemPlates.enabled) end,
+						},
+						totemplates_pulse_enabled = {
+							order = 8,
+							name = "Show Pulse Timer",
+							desc = "Show countdown to next pulse for totems like Tremor, Healing Stream, etc.",
+							type = "toggle",
+							width = "full",
+							disabled = function() return not (ShamanPower.opt.totemPlates and ShamanPower.opt.totemPlates.enabled) end,
+							get = function(info)
+								return ShamanPower.opt.totemPlates and ShamanPower.opt.totemPlates.showPulseTimer ~= false
+							end,
+							set = function(info, val)
+								ShamanPower:EnsureProfileTable("totemPlates")
+								ShamanPower.opt.totemPlates.showPulseTimer = val
+								ShamanPower:UpdateTotemPlatesPulseSettings()
+							end
+						},
+						totemplates_pulse_text = {
+							order = 9,
+							name = "Countdown Text",
+							desc = "Display the time until next pulse as text on the icon",
+							type = "toggle",
+							width = 1.0,
+							disabled = function() return not (ShamanPower.opt.totemPlates and ShamanPower.opt.totemPlates.enabled and ShamanPower.opt.totemPlates.showPulseTimer) end,
+							get = function(info)
+								return ShamanPower.opt.totemPlates and ShamanPower.opt.totemPlates.showPulseText ~= false
+							end,
+							set = function(info, val)
+								ShamanPower:EnsureProfileTable("totemPlates")
+								ShamanPower.opt.totemPlates.showPulseText = val
+								ShamanPower:UpdateTotemPlatesPulseSettings()
+							end
+						},
+						totemplates_pulse_bar = {
+							order = 10,
+							name = "Pulse Bar",
+							desc = "Display a progress bar showing time until next pulse",
+							type = "toggle",
+							width = 1.0,
+							disabled = function() return not (ShamanPower.opt.totemPlates and ShamanPower.opt.totemPlates.enabled and ShamanPower.opt.totemPlates.showPulseTimer) end,
+							get = function(info)
+								return ShamanPower.opt.totemPlates and ShamanPower.opt.totemPlates.showPulseBar ~= false
+							end,
+							set = function(info, val)
+								ShamanPower:EnsureProfileTable("totemPlates")
+								ShamanPower.opt.totemPlates.showPulseBar = val
+								ShamanPower:UpdateTotemPlatesPulseSettings()
+							end
+						},
+						totemplates_pulse_cooldown = {
+							order = 11,
+							name = "Cooldown Swipe",
+							desc = "Display a cooldown swipe animation on the icon",
+							type = "toggle",
+							width = 1.0,
+							disabled = function() return not (ShamanPower.opt.totemPlates and ShamanPower.opt.totemPlates.enabled and ShamanPower.opt.totemPlates.showPulseTimer) end,
+							get = function(info)
+								return ShamanPower.opt.totemPlates and ShamanPower.opt.totemPlates.showPulseCooldown or false
+							end,
+							set = function(info, val)
+								ShamanPower:EnsureProfileTable("totemPlates")
+								ShamanPower.opt.totemPlates.showPulseCooldown = val
+								ShamanPower:UpdateTotemPlatesPulseSettings()
+							end
+						},
+						totemplates_pulse_text_size = {
+							order = 12,
+							name = "Text Size",
+							desc = "Font size for the pulse countdown text",
+							type = "range",
+							min = 8, max = 24, step = 1,
+							width = 1.0,
+							disabled = function() return not (ShamanPower.opt.totemPlates and ShamanPower.opt.totemPlates.enabled and ShamanPower.opt.totemPlates.showPulseTimer and ShamanPower.opt.totemPlates.showPulseText) end,
+							get = function(info)
+								return ShamanPower.opt.totemPlates and ShamanPower.opt.totemPlates.pulseTextSize or 14
+							end,
+							set = function(info, val)
+								ShamanPower:EnsureProfileTable("totemPlates")
+								ShamanPower.opt.totemPlates.pulseTextSize = val
+								ShamanPower:UpdateTotemPlatesPulseSettings()
+							end
+						},
+						totemplates_pulse_bar_height = {
+							order = 13,
+							name = "Bar Height",
+							desc = "Height of the pulse progress bar",
+							type = "range",
+							min = 2, max = 12, step = 1,
+							width = 1.0,
+							disabled = function() return not (ShamanPower.opt.totemPlates and ShamanPower.opt.totemPlates.enabled and ShamanPower.opt.totemPlates.showPulseTimer and ShamanPower.opt.totemPlates.showPulseBar) end,
+							get = function(info)
+								return ShamanPower.opt.totemPlates and ShamanPower.opt.totemPlates.pulseBarHeight or 4
+							end,
+							set = function(info, val)
+								ShamanPower:EnsureProfileTable("totemPlates")
+								ShamanPower.opt.totemPlates.pulseBarHeight = val
+								ShamanPower:UpdateTotemPlatesPulseSettings()
+							end
 						},
 					}
 				},

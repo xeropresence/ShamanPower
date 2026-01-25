@@ -23,6 +23,18 @@ local strfind = string.find
 local strsub = string.sub
 local format = string.format
 
+-- Pre-built number strings for 0-20 (avoids tostring() garbage for charges/counts)
+local NumberStrings = {}
+for i = 0, 20 do
+	NumberStrings[i] = tostring(i)
+end
+
+-- Pre-built minute strings "0m" to "60m" for weapon imbue timer (avoids concat garbage)
+local MinuteStrings = {}
+for i = 0, 60 do
+	MinuteStrings[i] = i .. "m"
+end
+
 -- Shaman tracking tables by element
 local EarthShamans, FireShamans, WaterShamans, AirShamans = {}, {}, {}, {}
 local classlist, classes = {}, {}
@@ -2707,24 +2719,46 @@ function ShamanPower:UpdateTotemProgressBarPositions()
 	end
 end
 
--- Format duration time as M:SS or just seconds
+-- Format duration time as M:SS or just seconds (with caching to avoid string garbage)
+local FormatDurationCache = {}
+local FormatDurationCacheSize = 0
+local DURATION_CACHE_MAX = 500  -- Limit cache size to prevent unbounded growth
+
 local function FormatDuration(seconds)
-	if seconds >= 3600 then
-		-- 1 hour or more: show "1h", "2h", etc.
-		local hours = math.floor(seconds / 3600)
-		return string.format("%dh", hours)
-	elseif seconds >= 600 then
-		-- 10 minutes or more: show "10m", "55m", etc. (compact)
-		local mins = math.floor(seconds / 60)
-		return string.format("%dm", mins)
-	elseif seconds >= 60 then
-		-- 1-10 minutes: show "M:SS" format
-		local mins = math.floor(seconds / 60)
-		local secs = math.floor(seconds % 60)
-		return string.format("%d:%02d", mins, secs)
+	local intSec = math.floor(seconds)
+	if intSec < 0 then intSec = 0 end
+
+	-- Check cache first
+	local cached = FormatDurationCache[intSec]
+	if cached then return cached end
+
+	-- Generate formatted string
+	local result
+	if intSec >= 3600 then
+		local hours = math.floor(intSec / 3600)
+		result = hours .. "h"
+	elseif intSec >= 600 then
+		local mins = math.floor(intSec / 60)
+		result = mins .. "m"
+	elseif intSec >= 60 then
+		local mins = math.floor(intSec / 60)
+		local secs = intSec % 60
+		if secs < 10 then
+			result = mins .. ":0" .. secs
+		else
+			result = mins .. ":" .. secs
+		end
 	else
-		return string.format("%d", math.floor(seconds))
+		result = tostring(intSec)
 	end
+
+	-- Cache the result (with size limit)
+	if FormatDurationCacheSize < DURATION_CACHE_MAX then
+		FormatDurationCache[intSec] = result
+		FormatDurationCacheSize = FormatDurationCacheSize + 1
+	end
+
+	return result
 end
 
 -- Update progress bars based on totem duration
@@ -5603,22 +5637,71 @@ end
 -- ============================================================================
 
 -- Update player's own totem range (desaturate icons when out of range)
+-- Reusable arrays for totem range check (avoids creating garbage)
+ShamanPower.totemRangeBuffNames = {nil, nil, nil, nil}  -- Buff names to check (indexed by element)
+ShamanPower.totemRangeResults = {false, false, false, false}  -- Results (indexed by element)
+
 function ShamanPower:UpdatePlayerTotemRange()
+	-- Collect buff names we need to check for each element
+	local buffNames = self.totemRangeBuffNames
+	local results = self.totemRangeResults
+	local buffLowerCache = self.buffNameLowerCache or {}
+	self.buffNameLowerCache = buffLowerCache
+
+	-- Reset results and collect buff names
+	for element = 1, 4 do
+		results[element] = false
+		local slot = self.ElementToSlot[element]
+		local haveTotem = slot and GetTotemInfo(slot)
+		if haveTotem then
+			buffNames[element] = self:GetActiveTotemBuffName(element)
+		else
+			buffNames[element] = nil
+		end
+	end
+
+	-- Single scan through player buffs, checking all 4 elements at once
+	local scannedCache = self.scannedBuffLowerCache or {}
+	self.scannedBuffLowerCache = scannedCache
+
+	for i = 1, 20 do
+		local name = UnitBuff("player", i)
+		if not name then break end
+
+		local nameLower = scannedCache[name]
+		if not nameLower then
+			nameLower = name:lower()
+			scannedCache[name] = nameLower
+		end
+
+		-- Check this buff against all 4 element buff names
+		for element = 1, 4 do
+			if not results[element] and buffNames[element] then
+				local searchLower = buffLowerCache[buffNames[element]]
+				if not searchLower then
+					searchLower = buffNames[element]:lower()
+					buffLowerCache[buffNames[element]] = searchLower
+				end
+				if nameLower:find(searchLower, 1, true) then
+					results[element] = true
+				end
+			end
+		end
+	end
+
+	-- Now apply the results to icons
 	for element = 1, 4 do
 		local slot = self.ElementToSlot[element]
 		local haveTotem = slot and GetTotemInfo(slot)
+		local hasBuff = results[element]
 
-		-- Check if active overlay is showing (different totem than assigned)
+		-- Check if active overlay is showing
 		local activeOverlay = self.activeTotemOverlays and self.activeTotemOverlays[element]
 		local overlayActive = activeOverlay and activeOverlay.isActive
 
 		if overlayActive then
-			-- Active overlay is showing - grey the OVERLAY icon if out of range
-			-- (main icon is already grey from UpdateActiveTotemOverlays)
 			if haveTotem and activeOverlay.icon then
-				local buffName = self:GetActiveTotemBuffName(element)
-				if buffName then
-					local hasBuff = self:UnitHasBuff("player", buffName)
+				if buffNames[element] then
 					activeOverlay.icon:SetDesaturated(not hasBuff)
 					if not hasBuff then
 						activeOverlay.icon:SetVertexColor(0.6, 0.6, 0.6)
@@ -5626,30 +5709,21 @@ function ShamanPower:UpdatePlayerTotemRange()
 						activeOverlay.icon:SetVertexColor(1, 1, 1)
 					end
 				else
-					-- No trackable buff (Tremor, etc.) - show normal
 					activeOverlay.icon:SetDesaturated(false)
 					activeOverlay.icon:SetVertexColor(1, 1, 1)
 				end
 			end
 		else
-			-- No overlay - grey the MAIN icon if out of range
 			local totemBtn = self.totemButtons[element]
 			local iconTexture = totemBtn and totemBtn.icon
 			if iconTexture then
 				if haveTotem then
-					-- Totem is active - check if player has the buff
-					local buffName = self:GetActiveTotemBuffName(element)
-
-					if buffName then
-						local hasBuff = self:UnitHasBuff("player", buffName)
-						-- Desaturate (grey out) if out of range
+					if buffNames[element] then
 						iconTexture:SetDesaturated(not hasBuff)
 					else
-						-- Damage totem or no trackable buff - show normal
 						iconTexture:SetDesaturated(false)
 					end
 				else
-					-- No totem active - show normal (not greyed)
 					iconTexture:SetDesaturated(false)
 				end
 			end
@@ -5672,6 +5746,7 @@ ShamanPower.TrackedCooldowns = {
 	{20608, "Reincarnation", "cooldown", "cdbarShowReincarnation"},  -- Ankh cooldown
 	{16188, "Nature's Swiftness", "cooldown", "cdbarShowNS"},  -- NS cooldown (Resto talent)
 	{16190, "Mana Tide Totem", "cooldown", "cdbarShowManaTide"},  -- Mana Tide cooldown (Resto talent)
+	{30823, "Shamanistic Rage", "cooldown", "cdbarShowShamanisticRage"},  -- Shamanistic Rage cooldown (Enhancement talent)
 	{2825, "Bloodlust", "cooldown", "cdbarShowBloodlust"},  -- Bloodlust (Horde)
 	{32182, "Heroism", "cooldown", "cdbarShowBloodlust"},  -- Heroism (Alliance)
 }
@@ -6092,8 +6167,6 @@ function ShamanPower:CreateCooldownBar()
 		self:RegisterUpdateSubsystem("cooldownBar", 0.2, function()
 			ShamanPower:UpdateCooldownButtons()
 			ShamanPower:UpdateWeaponImbueButton()
-
-			-- Update cooldown bar opacity (for "full opacity when active" option)
 			if ShamanPower.opt.cooldownBarFullOpacityWhenActive then
 				ShamanPower:UpdateCooldownBarOpacity()
 			end
@@ -6308,37 +6381,39 @@ function ShamanPower:UpdateCooldownButtons()
 	local barHeight = self.opt.cdbarProgressBarHeight or 3
 	local textLocation = self.opt.cdbarDurationTextLocation or "none"
 
-	for _, btn in ipairs(self.cooldownButtons) do
+	-- Use numeric for loop instead of ipairs to avoid iterator garbage
+	for i = 1, #self.cooldownButtons do
+		local btn = self.cooldownButtons[i]
 		local buttonHeight = btn:GetHeight()
 		local buttonWidth = btn:GetWidth()
 
 		if btn.spellType == "shield" then
-			-- Check if any shield is active
+			-- Use cached shield state from UNIT_AURA event (no UnitBuff calls here!)
+			local cache = self.shieldCache
 			local hasShield = false
 			local activeShieldID = nil
 			local activeShieldIcon = nil
 			local shieldDuration = 0
 			local shieldExpiration = 0
-
 			local shieldCharges = 0
-			for _, shieldData in ipairs(self.ShieldSpells) do
-				local shieldID, shieldName = shieldData[1], shieldData[2]
-				-- Use UnitBuff to get charges (count) and duration
-				for i = 1, 40 do
-					local name, icon, count, _, duration, expirationTime = UnitBuff("player", i)
-					if not name then break end
-					if name == shieldName then
-						hasShield = true
-						activeShieldID = shieldID
-						activeShieldIcon = icon
-						shieldCharges = count or 0
-						shieldDuration = duration or 0
-						shieldExpiration = expirationTime or 0
-						break
-					end
-				end
-				if hasShield then break end
+
+			if not cache then
+				-- No cache yet, do initial scan
+				self:ScanPlayerShield()
+				cache = self.shieldCache
 			end
+
+			if cache and cache.hasShield then
+				-- Use fully cached values - no UnitBuff calls needed!
+				-- Duration/charges are updated by UNIT_AURA event when shield procs
+				hasShield = true
+				activeShieldID = cache.shieldID
+				activeShieldIcon = cache.shieldIcon
+				shieldCharges = cache.shieldCharges
+				shieldDuration = cache.shieldDuration
+				shieldExpiration = cache.shieldExpiration
+			end
+			-- If cache exists and hasShield is false, we know there's no shield - no scanning needed!
 
 			if hasShield then
 				btn.darkOverlay:Hide()
@@ -6358,7 +6433,7 @@ function ShamanPower:UpdateCooldownButtons()
 				-- Show charge count with optional coloring
 				if btn.chargeText then
 					if shieldCharges > 0 then
-						btn.chargeText:SetText(tostring(shieldCharges))
+						btn.chargeText:SetText(NumberStrings[shieldCharges] or tostring(shieldCharges))
 						-- Color based on charges if enabled
 						if self.opt.shieldChargeColors then
 							if shieldCharges >= 3 then
@@ -6903,24 +6978,14 @@ function ShamanPower:UpdateCooldownBarOpacity()
 			-- Set bar to full opacity, but we'll control individual button opacity
 			self.cooldownBar:SetAlpha(1.0)
 
-			-- Check each button for active state
-			for _, btn in ipairs(self.cooldownButtons) do
+			-- Check each button for active state (reuse state from UpdateCooldownButtons)
+			for i = 1, #self.cooldownButtons do
+				local btn = self.cooldownButtons[i]
 				local isActive = false
 
 				if btn.spellType == "shield" then
-					-- Shield is active if player has the buff
-					local shieldID = btn.activeShieldID or btn.spellID
-					local shieldName = GetSpellInfo(shieldID)
-					if shieldName then
-						for i = 1, 40 do
-							local name = UnitBuff("player", i)
-							if not name then break end
-							if name == shieldName then
-								isActive = true
-								break
-							end
-						end
-					end
+					-- Reuse activeShieldID set by UpdateCooldownButtons (no re-scanning needed)
+					isActive = btn.activeShieldID ~= nil
 				elseif btn.spellType == "cooldown" then
 					-- Cooldown is active if on cooldown
 					local start, duration = GetSpellCooldown(btn.spellID)
@@ -6929,10 +6994,8 @@ function ShamanPower:UpdateCooldownBarOpacity()
 					end
 				elseif btn.spellType == "imbue" then
 					-- Imbue is active if weapon is enchanted
-					local hasMain, _, _, _, _, _, hasOff = GetWeaponEnchantInfo()
-					if hasMain or hasOff then
-						isActive = true
-					end
+					local hasMain = GetWeaponEnchantInfo()
+					isActive = hasMain
 				end
 
 				btn:SetAlpha(isActive and 1.0 or opacity)
@@ -6941,8 +7004,8 @@ function ShamanPower:UpdateCooldownBarOpacity()
 			self.cooldownBar:SetAlpha(opacity)
 			-- Reset all buttons to inherit bar opacity
 			if self.cooldownButtons then
-				for _, btn in ipairs(self.cooldownButtons) do
-					btn:SetAlpha(1.0)  -- Full relative to parent
+				for i = 1, #self.cooldownButtons do
+					self.cooldownButtons[i]:SetAlpha(1.0)  -- Full relative to parent
 				end
 			end
 		end
@@ -7639,7 +7702,7 @@ function ShamanPower:UpdateWeaponImbueButton()
 		-- Update time text (show main hand time)
 		if showText then
 			local mins = math.floor(mainExp / 60000)
-			btn.timeText:SetText(mins .. "m")
+			btn.timeText:SetText(MinuteStrings[mins] or (mins .. "m"))
 			btn.timeText:Show()
 		else
 			btn.timeText:SetText("")
@@ -9097,7 +9160,7 @@ function ShamanPower:UpdateEarthShieldCharges()
 	local currentTarget, charges = self:FindEarthShieldTarget()
 
 	if currentTarget and charges and charges > 0 then
-		chargeText:SetText(tostring(charges))
+		chargeText:SetText(NumberStrings[charges] or tostring(charges))
 		-- Color based on charges if enabled (Earth Shield has more charges: 6-10)
 		if self.opt.shieldChargeColors then
 			if charges >= 5 then
@@ -10269,6 +10332,11 @@ function ShamanPower:PLAYER_ENTERING_WORLD()
 		self:CreateShieldChargeDisplays()
 	end)
 
+	-- Initialize Totem Plates (replace totem nameplates with icons)
+	C_Timer.After(3.5, function()
+		self:InitializeTotemPlates()
+	end)
+
 	-- Set up totem bar visibility updater (hide out of combat / hide when no totems)
 	C_Timer.After(1, function()
 		self:SetupTotemBarVisibilityUpdater()
@@ -10473,6 +10541,52 @@ function ShamanPower:UNIT_AURA(event, unit)
 	if self.esTrackedTargetGUID then
 		self:OnEarthShieldAuraChange(unit)
 	end
+
+	-- Scan for shield buffs when player auras change (avoids polling)
+	if unit == "player" then
+		self:ScanPlayerShield()
+	end
+end
+
+-- Scan player buffs for shield (called on UNIT_AURA, not every update tick)
+function ShamanPower:ScanPlayerShield()
+	local hasShield = false
+	local shieldID = nil
+	local shieldIcon = nil
+	local shieldCharges = 0
+	local shieldDuration = 0
+	local shieldExpiration = 0
+	local shieldBuffIndex = nil
+
+	for i = 1, 40 do
+		local name, icon, count, _, duration, expirationTime = UnitBuff("player", i)
+		if not name then break end
+		for j = 1, #self.ShieldSpells do
+			local shieldData = self.ShieldSpells[j]
+			if name == shieldData[2] then
+				hasShield = true
+				shieldID = shieldData[1]
+				shieldIcon = icon
+				shieldCharges = count or 0
+				shieldDuration = duration or 0
+				shieldExpiration = expirationTime or 0
+				shieldBuffIndex = i
+				break
+			end
+		end
+		if hasShield then break end
+	end
+
+	-- Cache the result
+	self.shieldCache = {
+		hasShield = hasShield,
+		shieldID = shieldID,
+		shieldIcon = shieldIcon,
+		shieldCharges = shieldCharges,
+		shieldDuration = shieldDuration,
+		shieldExpiration = shieldExpiration,
+		buffIndex = shieldBuffIndex,
+	}
 end
 
 function ShamanPower:ParseMessage(sender, msg)
@@ -14051,12 +14165,31 @@ if not ShamanPower.ShieldChargesLoaded then
 	ShamanPower.shieldChargeFrames = {}
 end
 
+-- Totem Plates module stubs (loaded by ShamanPower_TotemPlates addon)
+-- Replaces totem nameplates with clean, recognizable icons
+if not ShamanPower.TotemPlatesLoaded then
+	-- Provide stub functions when module not loaded
+	function ShamanPower:InitializeTotemPlates() end
+	function ShamanPower:ToggleTotemPlates()
+		print("|cffff8800ShamanPower:|r Totem Plates module not loaded. Enable 'ShamanPower [Totem Plates]' in your AddOns.")
+	end
+	function ShamanPower:UpdateTotemPlatesSize() end
+	function ShamanPower:UpdateTotemPlatesPulseSettings() end
+	function ShamanPower:DetectNameplateAddon() end
+
+	-- Initialize empty tables
+	ShamanPower.activeTotemPlates = {}
+	ShamanPower.totemPlateCache = {}
+	ShamanPower.detectedNameplateAddon = "Blizzard"
+end
+
 -- NOTE: The actual implementations of these functions are in:
 -- - ShamanPower_RaidCooldowns/ShamanPower_RaidCooldowns.lua
 -- - ShamanPower_SPRange/ShamanPower_SPRange.lua
 -- - ShamanPower_ESTracker/ShamanPower_ESTracker.lua
 -- - ShamanPower_PartyRange/ShamanPower_PartyRange.lua
 -- - ShamanPower_ShieldCharges/ShamanPower_ShieldCharges.lua
+-- - ShamanPower_TotemPlates/ShamanPower_TotemPlates.lua
 -- When those modules are loaded, they override these stub functions.
 
 
@@ -14166,4 +14299,5 @@ SlashCmdList["SPCENTER"] = function(msg)
 
 	print("|cff00ff00ShamanPower:|r Frames reset to center. Use ALT+drag to reposition.")
 end
+
 

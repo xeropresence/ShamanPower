@@ -47,6 +47,18 @@ SP.TotemBuffNames = {
 	},
 }
 
+-- Pre-computed lowercase versions to avoid string garbage during updates
+SP.TotemBuffNamesLower = {}
+for element, buffs in pairs(SP.TotemBuffNames) do
+	SP.TotemBuffNamesLower[element] = {}
+	for idx, name in pairs(buffs) do
+		SP.TotemBuffNamesLower[element][idx] = name:lower()
+	end
+end
+
+-- Cache for totem name lookups (avoids repeated string operations)
+SP.totemBuffCache = {}
+
 -- Create party range dots for a totem button
 function SP:CreatePartyRangeDots(button, element)
 	if not button then return end
@@ -107,10 +119,23 @@ function SP:GetActiveTotemBuffName(element)
 	if not slot then return nil end
 
 	local haveTotem, totemName = GetTotemInfo(slot)
-	if not haveTotem or not totemName then return nil end
+	if not haveTotem or not totemName then
+		self.totemBuffCache[element] = nil
+		return nil
+	end
+
+	-- Check cache first (avoids string operations every update)
+	local cached = self.totemBuffCache[element]
+	if cached and cached.totemName == totemName then
+		return cached.buffName
+	end
 
 	local buffNames = self.TotemBuffNames[element]
-	if not buffNames then return nil end
+	local buffNamesLower = self.TotemBuffNamesLower[element]
+	if not buffNames then
+		self.totemBuffCache[element] = {totemName = totemName, buffName = nil}
+		return nil
+	end
 
 	-- Match based on actual totem name from GetTotemInfo (not assignments!)
 	-- This ensures we check the buff for the ACTIVE totem, not the assigned one
@@ -121,9 +146,11 @@ function SP:GetActiveTotemBuffName(element)
 
 	for totemIndex, buffName in pairs(buffNames) do
 		if type(buffName) == "string" then
-			local buffLower = buffName:lower()
+			local buffLower = buffNamesLower[totemIndex]
 			-- Check if totem name contains the buff search term
 			if totemLower:find(buffLower, 1, true) or fullNameLower:find(buffLower, 1, true) then
+				-- Cache the result
+				self.totemBuffCache[element] = {totemName = totemName, buffName = buffName}
 				return buffName
 			end
 		end
@@ -131,10 +158,11 @@ function SP:GetActiveTotemBuffName(element)
 
 	-- No matching buff found - this totem doesn't have a trackable buff
 	-- (e.g., Tremor, Disease Cleansing, Searing, etc.)
+	self.totemBuffCache[element] = {totemName = totemName, buffName = nil}
 	return nil
 end
 
--- Check if a unit has a specific buff (optimized for performance)
+-- Check if a unit has a specific buff
 function SP:UnitHasBuff(unit, buffName)
 	if not buffName then return false end
 
@@ -143,21 +171,20 @@ function SP:UnitHasBuff(unit, buffName)
 		return AuraUtil.FindAuraByName(buffName, unit) ~= nil
 	end
 
-	-- Fallback: scan first 20 buffs (totems are usually early in the list)
-	for i = 1, 20 do
+	-- Simple direct scan (same approach as TotemTimers)
+	for i = 1, 40 do
 		local name = UnitBuff(unit, i)
-		if not name then break end
-		-- Case-insensitive partial match
-		if name:lower():find(buffName:lower(), 1, true) then
-			return true
-		end
+		if not name then return false end
+		if name == buffName then return true end
 	end
+
 	return false
 end
 
 -- Reusable table for party units (avoids creating garbage every call)
 SP.partyUnitsCache = {}
 SP.emptyTable = {}  -- Shared empty table for early returns
+SP.partyUnitStrings = {"party1", "party2", "party3", "party4"}  -- Pre-built strings to avoid concatenation
 
 -- Get party/subgroup units efficiently
 -- In WoW, "party1-party4" works in both party AND raid (refers to your subgroup members)
@@ -180,10 +207,12 @@ function SP:GetCachedPartyUnits()
 	local count = 0
 
 	-- party1-party4 works in both party and raid (refers to subgroup in raids)
+	-- Use pre-built strings to avoid string concatenation garbage
 	for i = 1, numMembers do
-		if UnitExists("party" .. i) then
+		local unitStr = self.partyUnitStrings[i]
+		if UnitExists(unitStr) then
 			count = count + 1
-			partyUnits[count] = "party" .. i
+			partyUnits[count] = unitStr
 		end
 	end
 
@@ -195,17 +224,17 @@ function SP:UpdatePartyRangeDots()
 	-- Always update range counters (even if dots are disabled)
 	self:UpdateRangeCounters()
 
-	-- Enable/disable partyRange subsystem based on whether any tracking is enabled
+	-- Enable/disable partyRange subsystem based on whether any features are enabled
 	local rangeCounterEnabled = self.opt.rangeCounter and self.opt.rangeCounter.enabled
-	local trackingEnabled = self.opt.showPartyRangeDots or rangeCounterEnabled
-	if trackingEnabled then
+	local dotsEnabled = self.opt.showPartyRangeDots
+	if dotsEnabled or rangeCounterEnabled then
 		self:EnableUpdateSubsystem("partyRange")
 	else
 		self:DisableUpdateSubsystem("partyRange")
 	end
 
 	-- Check if dots feature is enabled
-	if not self.opt.showPartyRangeDots then
+	if not dotsEnabled then
 		-- Hide all dots when disabled
 		for element = 1, 4 do
 			if self.partyRangeDots[element] then
@@ -221,7 +250,6 @@ function SP:UpdatePartyRangeDots()
 
 	-- Get cached party/subgroup units (avoids looping 40 members every update)
 	local partyUnits, partyCount = self:GetCachedPartyUnits()
-	-- If solo, partyUnits is empty (no dots shown)
 
 	-- Update dots for each party member
 	for partyIndex = 1, 4 do
@@ -252,66 +280,53 @@ function SP:UpdatePartyRangeDots()
 			if dot then
 				if not exists then
 					dot:Hide()
-					-- Also hide the other dot
 					if useOverlay and mainDot then mainDot:Hide() end
 				else
 					local slot = self.ElementToSlot[element]
 					local haveTotem, totemName = GetTotemInfo(slot)
 
 					if haveTotem then
-						-- Totem is active - check if party member has the buff
 						local buffName = self:GetActiveTotemBuffName(element)
 						local hasBuff = buffName and self:UnitHasBuff(unit, buffName)
 
 						-- Special case: Air element (4) with no buffName = Windfury Totem
-						-- We can't check other players' buffs with UnitBuff, so use
-						-- the broadcast system where each player reports their own buff status
-						-- Only show dots for players who have ShamanPower and are reporting
 						local isWindfury = (element == 4 and not buffName)
 						if isWindfury then
 							local playerName = UnitName(unit)
 							local wfStatus = self:IsPlayerInWindfuryRange(playerName)
 							if wfStatus == true then
-								-- Player reported having Windfury enchant - in range
 								if classColor then
 									dot:SetVertexColor(classColor.r, classColor.g, classColor.b)
 								else
-									dot:SetVertexColor(0, 1, 0)  -- Green
+									dot:SetVertexColor(0, 1, 0)
 								end
 								dot:Show()
 								if useOverlay and mainDot then mainDot:Hide() end
 							elseif wfStatus == false then
-								-- Player reported NOT having Windfury enchant - out of range
 								dot:SetVertexColor(1, 0, 0)
 								dot:Show()
 								if useOverlay and mainDot then mainDot:Hide() end
 							else
-								-- No data - player doesn't have ShamanPower, hide dot
 								dot:Hide()
 								if useOverlay and mainDot then mainDot:Hide() end
 							end
 						elseif hasBuff then
-							-- In range - show class-colored dot
 							if classColor then
 								dot:SetVertexColor(classColor.r, classColor.g, classColor.b)
 							else
-								dot:SetVertexColor(0, 1, 0)  -- Green
+								dot:SetVertexColor(0, 1, 0)
 							end
 							dot:Show()
 							if useOverlay and mainDot then mainDot:Hide() end
 						elseif buffName then
-							-- Has a buff to check but doesn't have it - out of range (red)
 							dot:SetVertexColor(1, 0, 0)
 							dot:Show()
 							if useOverlay and mainDot then mainDot:Hide() end
 						else
-							-- No buff to check (Tremor, Earthbind, Searing, etc.) - hide dot
-							-- These totems can't be tracked via buffs
 							dot:Hide()
 							if useOverlay and mainDot then mainDot:Hide() end
 						end
 					else
-						-- No totem active for this element
 						dot:Hide()
 						if useOverlay and mainDot then mainDot:Hide() end
 					end
