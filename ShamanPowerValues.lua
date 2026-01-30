@@ -98,6 +98,7 @@ SHAMANPOWER_DEFAULT_VALUES = {
         ShowTooltips = true,
         ShowWhenSolo = true,
         showDropAllButton = true,  -- Show the Drop All Totems button on mini bar
+        totemicCallOnTotemBar = false,  -- Show Totemic Call (recall) on totem bar instead of cooldown bar
         showPartyRangeDots = true,  -- Show party range indicator dots on mini totem bar
         showCooldownBar = true,  -- Show the cooldown tracker bar below totem bar
         showButtonKeybinds = false,  -- Show keybind text on buttons (top-right corner)
@@ -120,6 +121,7 @@ SHAMANPOWER_DEFAULT_VALUES = {
         cooldownFlyoutOpacity = 1.0,  -- Opacity of cooldown bar flyout menus (0.1 to 1.0)
         showTotemFlyouts = true,  -- Show flyout menus on mouseover for quick totem selection
         swapFlyoutClickButtons = false,  -- Swap flyout mouse buttons (left=assign, right=cast instead of default)
+        flyoutRequiresClick = false,  -- Require right-click to show flyout instead of mouseover
         hideEarthShieldText = false,  -- Hide the Earth Shield target name text on totem bar
         -- Raid Cooldown caller button options
         raidCDButtonOpacity = 1.0,  -- Opacity of raid cooldown caller buttons (0.1 to 1.0)
@@ -157,6 +159,7 @@ SHAMANPOWER_DEFAULT_VALUES = {
         syncToTotemTimers = false,  -- Sync assignments to TotemTimers addon (if installed)
         weaponEnchant = 1,  -- Default weapon enchant (Windfury)
         dynamicTotemMode = false,  -- Dynamic Mode: bar shows active totems instead of assigned (for PVP)
+        activeTotemAsMain = false,  -- TotemTimers style: show active totem as main icon, assigned as small corner indicator
         enableMiddleClickPopOut = true,  -- Allow middle-click to pop out buttons as standalone trackers
         hideOutOfCombat = false,  -- Hide totem bar when not in combat
         hideWhenNoTotems = false,  -- Hide totem bar when no totems are placed

@@ -401,15 +401,22 @@ end
 -- Helper function to ensure nested tables exist in the profile for proper saving
 -- AceDB returns default tables when profile doesn't have the key, but setting
 -- values on default tables doesn't persist to the profile
+-- Deep copy a table (for nested structures like position tables)
+local function DeepCopy(orig)
+	if type(orig) ~= "table" then return orig end
+	local copy = {}
+	for k, v in pairs(orig) do
+		copy[k] = DeepCopy(v)
+	end
+	return copy
+end
+
 function ShamanPower:EnsureProfileTable(tableName)
 	if not rawget(self.db.profile, tableName) then
-		-- Create a copy of the defaults in the profile
+		-- Create a deep copy of the defaults in the profile
 		local defaults = SHAMANPOWER_DEFAULT_VALUES.profile[tableName]
 		if defaults then
-			self.db.profile[tableName] = {}
-			for k, v in pairs(defaults) do
-				self.db.profile[tableName][k] = v
-			end
+			self.db.profile[tableName] = DeepCopy(defaults)
 		else
 			self.db.profile[tableName] = {}
 		end
@@ -2208,8 +2215,9 @@ function ShamanPower:UpdatePulseGlow(element, totemData, startTime)
 	if not glow then return end
 
 	-- Check if active overlay is showing for this element
+	-- In TotemTimers style mode (activeTotemAsMain), always use main button even when overlay is "active"
 	local activeOverlay = self.activeTotemOverlays and self.activeTotemOverlays[element]
-	local useOverlay = activeOverlay and activeOverlay.isActive
+	local useOverlay = activeOverlay and activeOverlay.isActive and not self.opt.activeTotemAsMain
 
 	-- Check if the active totem is popped out - if so, don't show pulse on main bar
 	local totemIsPoppedOut = false
@@ -3285,36 +3293,85 @@ function ShamanPower:UpdateActiveTotemOverlays()
 			end
 
 			local totemButton = self.totemButtons[element]
+			local useActiveAsMain = self.opt.activeTotemAsMain
 
-			if showOverlay and activeIcon and overlay.frame then
-				-- Show the active totem overlay
-				overlay.icon:SetTexture(activeIcon)
-				overlay.frame:Show()
+			if showOverlay and activeIcon then
 				overlay.isActive = true
 
-				-- Grey out the assigned totem icon
-				if iconTexture then
-					iconTexture:SetDesaturated(true)
-					iconTexture:SetAlpha(0.5)
+				if useActiveAsMain and totemButton then
+					-- TotemTimers style: main icon shows active totem, corner shows assigned
+					-- Hide the overlay frame (not needed in this mode)
+					if overlay.frame then
+						overlay.frame:Hide()
+					end
+
+					-- Change main button icon to active totem
+					if iconTexture then
+						iconTexture:SetTexture(activeIcon)
+						iconTexture:SetDesaturated(false)
+						iconTexture:SetAlpha(1)
+					end
+
+					-- Show assigned indicator in corner
+					if totemButton.assignedIndicator and totemButton.assignedIndicatorIcon then
+						local assignedIcon = self:GetTotemIcon(element, assignedIndex)
+						if assignedIcon then
+							totemButton.assignedIndicatorIcon:SetTexture(assignedIcon)
+							totemButton.assignedIndicator:Show()
+						end
+					end
+
+					-- Use main button's pulse overlay (not the overlay's)
+					-- The pulse will show on the active totem icon
+				else
+					-- Classic style: overlay shows active totem above the button
+					if overlay.frame then
+						overlay.icon:SetTexture(activeIcon)
+						overlay.frame:Show()
+					end
+
+					-- Grey out the assigned totem icon
+					if iconTexture then
+						iconTexture:SetDesaturated(true)
+						iconTexture:SetAlpha(0.5)
+					end
+
+					-- Hide assigned indicator (not used in this mode)
+					if totemButton and totemButton.assignedIndicator then
+						totemButton.assignedIndicator:Hide()
+					end
+
+					-- Hide main button's pulse overlay (we'll use overlay's)
+					if self.pulseOverlays and self.pulseOverlays[element] then
+						local pulse = self.pulseOverlays[element]
+						if pulse.wipe then pulse.wipe:Hide() end
+						for _, glow in ipairs(pulse.glows or {}) do
+							glow:SetAlpha(0)
+						end
+					end
 				end
 
 				-- Note: Range dots are handled by UpdatePartyRangeDots()
 				-- which checks overlay.isActive and updates the correct dots
-
-				-- Hide main button's pulse overlay (we'll use overlay's)
-				if self.pulseOverlays and self.pulseOverlays[element] then
-					local pulse = self.pulseOverlays[element]
-					if pulse.wipe then pulse.wipe:Hide() end
-					for _, glow in ipairs(pulse.glows or {}) do
-						glow:SetAlpha(0)
-					end
-				end
 			else
-				-- Hide overlay, restore normal icon
+				-- No active totem or same as assigned - restore normal state
 				if overlay.frame then
 					overlay.frame:Hide()
 				end
 				overlay.isActive = false
+
+				-- Hide assigned indicator
+				if totemButton and totemButton.assignedIndicator then
+					totemButton.assignedIndicator:Hide()
+				end
+
+				-- Restore main button icon to assigned totem
+				if useActiveAsMain and totemButton and iconTexture then
+					local assignedIcon = self:GetTotemIcon(element, assignedIndex)
+					if assignedIcon then
+						iconTexture:SetTexture(assignedIcon)
+					end
+				end
 
 				-- Hide overlay's dots and pulse
 				if overlay.dots then
@@ -4623,6 +4680,25 @@ function ShamanPower:CreateTotemButtons()
 			btn.icon:SetTexture(elementIcons[element])
 		end
 
+		-- Create small corner indicator for "assigned totem" (used in TotemTimers style mode)
+		local assignedIndicator = CreateFrame("Frame", nil, btn)
+		assignedIndicator:SetSize(12, 12)
+		assignedIndicator:SetPoint("BOTTOMRIGHT", btn, "BOTTOMRIGHT", 0, 0)
+		assignedIndicator:SetFrameLevel(btn:GetFrameLevel() + 10)
+		assignedIndicator:Hide()
+
+		local indicatorBg = assignedIndicator:CreateTexture(nil, "BACKGROUND")
+		indicatorBg:SetAllPoints()
+		indicatorBg:SetColorTexture(0, 0, 0, 0.8)
+
+		local indicatorIcon = assignedIndicator:CreateTexture(nil, "ARTWORK")
+		indicatorIcon:SetPoint("TOPLEFT", 1, -1)
+		indicatorIcon:SetPoint("BOTTOMRIGHT", -1, 1)
+		indicatorIcon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+
+		btn.assignedIndicator = assignedIndicator
+		btn.assignedIndicatorIcon = indicatorIcon
+
 		-- SECURE HANDLER: Show flyout on enter (WORKS IN COMBAT)
 		btn:SetAttribute("OpenMenu", "mouseover")
 		btn:SetAttribute("_onenter", [[
@@ -4635,6 +4711,14 @@ function ShamanPower:CreateTotemButtons()
 		btn:SetAttribute("_onleave", [[
 			if not self:IsUnderMouse(true) then
 				self:ChildUpdate("show", false)
+			end
+		]])
+
+		-- SECURE HANDLER: Show flyout on right-click when in click mode (WORKS IN COMBAT)
+		btn:SetAttribute("_onmouseup", [[
+			local button = button
+			if button == "RightButton" and self:GetAttribute("OpenMenu") == "click" then
+				self:ChildUpdate("show", true)
 			end
 		]])
 
@@ -4837,9 +4921,16 @@ function ShamanPower:UpdateTotemButtons()
 				btn:SetAttribute("spell1", spellName)
 			end
 
-			-- Right-click to cast Totemic Call (destroys all totems)
-			btn:SetAttribute("type2", "spell")
-			btn:SetAttribute("spell2", GetSpellInfo(36936))  -- Totemic Call
+			-- Right-click behavior: Totemic Call by default, or flyout trigger if option enabled
+			if self.opt.showTotemFlyouts and self.opt.flyoutRequiresClick then
+				-- Right-click shows flyout instead of Totemic Call
+				btn:SetAttribute("type2", nil)
+				btn:SetAttribute("spell2", nil)
+			else
+				-- Right-click to cast Totemic Call (destroys all totems)
+				btn:SetAttribute("type2", "spell")
+				btn:SetAttribute("spell2", GetSpellInfo(36936))  -- Totemic Call
+			end
 
 			-- Handle visibility and positioning (only for non-popped-out elements)
 			if not elementVisible[element] then
@@ -5589,13 +5680,17 @@ function ShamanPower:UpdateTotemFlyoutEnabled()
 	end
 
 	local enabled = self.opt.showTotemFlyouts
+	local requiresClick = self.opt.flyoutRequiresClick
+	local totemicCallName = GetSpellInfo(36936)  -- Totemic Call
+
 	for element = 1, 4 do
 		local btn = self.totemButtons[element]
 		if btn then
-			if enabled then
-				btn:SetAttribute("OpenMenu", "mouseover")
-			else
+			if not enabled then
+				-- Flyouts disabled
 				btn:SetAttribute("OpenMenu", nil)
+				btn:SetAttribute("type2", "spell")
+				btn:SetAttribute("spell2", totemicCallName)
 				-- Hide any visible flyout buttons directly
 				local flyout = self.totemFlyouts[element]
 				if flyout and flyout.buttons then
@@ -5603,6 +5698,16 @@ function ShamanPower:UpdateTotemFlyoutEnabled()
 						flyoutBtn:Hide()
 					end
 				end
+			elseif requiresClick then
+				-- Flyouts enabled, right-click to show
+				btn:SetAttribute("OpenMenu", "click")
+				btn:SetAttribute("type2", nil)  -- Disable Totemic Call on right-click
+				btn:SetAttribute("spell2", nil)
+			else
+				-- Flyouts enabled, mouseover to show (default)
+				btn:SetAttribute("OpenMenu", "mouseover")
+				btn:SetAttribute("type2", "spell")
+				btn:SetAttribute("spell2", totemicCallName)
 			end
 		end
 	end
@@ -5879,6 +5984,11 @@ function ShamanPower:CreateCooldownBar()
 		-- Check if this item is enabled in options (default to true if not set)
 		local isEnabled = (optionKey == nil) or (self.opt[optionKey] ~= false)
 
+		-- Skip Totemic Call on cooldown bar if it should be on totem bar instead
+		if spellID == 36936 and self.opt.totemicCallOnTotemBar then
+			isEnabled = false
+		end
+
 		-- For shield type, check if player knows any shield spell
 		-- (check regardless of isEnabled - hidden buttons still need to be functional)
 		local knowsSpell = false
@@ -5910,7 +6020,7 @@ function ShamanPower:CreateCooldownBar()
 		end
 
 		-- Only create button if player knows this spell and it's enabled
-		if knowsSpell then
+		if knowsSpell and isEnabled then
 			numButtons = numButtons + 1
 
 			-- Use different templates for shield (needs combat flyout) vs other buttons
@@ -6169,6 +6279,10 @@ function ShamanPower:CreateCooldownBar()
 			ShamanPower:UpdateWeaponImbueButton()
 			if ShamanPower.opt.cooldownBarFullOpacityWhenActive then
 				ShamanPower:UpdateCooldownBarOpacity()
+			end
+			-- Update Totemic Call on totem bar opacity if shown there
+			if ShamanPower.opt.totemicCallOnTotemBar then
+				ShamanPower:UpdateTotemicCallOpacity()
 			end
 		end)
 	end
@@ -6678,6 +6792,7 @@ function ShamanPower:UpdateCooldownButtons()
 end
 
 function ShamanPower:UpdateCooldownBar()
+	if not isShaman then return end
 	-- Don't update while dragging
 	if self.cooldownBarDragging then return end
 
@@ -6978,19 +7093,50 @@ function ShamanPower:UpdateCooldownBarOpacity()
 			-- Set bar to full opacity, but we'll control individual button opacity
 			self.cooldownBar:SetAlpha(1.0)
 
-			-- Check each button for active state (reuse state from UpdateCooldownButtons)
+			-- Check each button for active state
 			for i = 1, #self.cooldownButtons do
 				local btn = self.cooldownButtons[i]
 				local isActive = false
 
 				if btn.spellType == "shield" then
-					-- Reuse activeShieldID set by UpdateCooldownButtons (no re-scanning needed)
+					-- Shield is active if player has the buff
 					isActive = btn.activeShieldID ~= nil
 				elseif btn.spellType == "cooldown" then
-					-- Cooldown is active if on cooldown
-					local start, duration = GetSpellCooldown(btn.spellID)
-					if start and start > 0 and duration > 1.5 then
-						isActive = true
+					-- Check if the buff is active on the player (for spells with buffs)
+					local spellID = btn.spellID
+					local spellName = btn.spellName
+
+					-- Check for specific buff-based abilities
+					if spellID == 16188 then
+						-- Nature's Swiftness - check if NS buff is active
+						isActive = AuraUtil.FindAuraByName("Nature's Swiftness", "player", "HELPFUL") ~= nil
+					elseif spellID == 30823 then
+						-- Shamanistic Rage - check if SR buff is active
+						isActive = AuraUtil.FindAuraByName("Shamanistic Rage", "player", "HELPFUL") ~= nil
+					elseif spellID == 2825 or spellID == 32182 then
+						-- Bloodlust/Heroism - check if buff is active
+						local hasBL = AuraUtil.FindAuraByName("Bloodlust", "player", "HELPFUL")
+						local hasHero = AuraUtil.FindAuraByName("Heroism", "player", "HELPFUL")
+						isActive = hasBL ~= nil or hasHero ~= nil
+					elseif spellID == 16190 then
+						-- Mana Tide Totem - check if MTT is active (water totem slot 3)
+						local haveTotem, totemName = GetTotemInfo(3)
+						if haveTotem and totemName and totemName:find("Mana Tide") then
+							isActive = true
+						end
+					elseif spellID == 36936 then
+						-- Totemic Call - active if any totems are placed
+						for slot = 1, 4 do
+							local haveTotem = GetTotemInfo(slot)
+							if haveTotem then
+								isActive = true
+								break
+							end
+						end
+					elseif spellID == 20608 then
+						-- Reincarnation - active if off cooldown and available
+						local start, duration = GetSpellCooldown(spellID)
+						isActive = (not start or start == 0 or duration <= 1.5)
 					end
 				elseif btn.spellType == "imbue" then
 					-- Imbue is active if weapon is enchanted
@@ -7964,6 +8110,8 @@ function ShamanPower:UpdateMiniTotemBar()
 	local separatorSize = 12  -- Extra gap for separator
 	local showDropAll = self.opt.showDropAllButton ~= false  -- Default to true if not set
 	local dropAllPoppedOut = self:IsDropAllPoppedOut()
+	-- Show Totemic Call on totem bar if option is enabled (spell knowledge is validated by CD bar settings)
+	local showTotemicCall = self.opt.totemicCallOnTotemBar and self.opt.cdbarShowRecall ~= false
 
 	-- Check which totem buttons should be visible (not hidden in options and not popped out)
 	local elementVisible = {
@@ -7984,22 +8132,27 @@ function ShamanPower:UpdateMiniTotemBar()
 	-- Resize the parent frame based on layout and visible button count
 	-- Don't include Drop All in size calculations if it's popped out
 	local includeDropAll = showDropAll and not dropAllPoppedOut
+	-- Count extra buttons (Drop All and/or Totemic Call)
+	local extraButtonCount = 0
+	if includeDropAll then extraButtonCount = extraButtonCount + 1 end
+	if showTotemicCall then extraButtonCount = extraButtonCount + 1 end
+
 	if isHorizontal then
 		-- Horizontal: wide and short
 		local totalWidth = (buttonSize * visibleCount) + (spacing * math.max(0, visibleCount - 1)) + (padding * 2)
-		if includeDropAll and visibleCount > 0 then
-			totalWidth = totalWidth + separatorSize + buttonSize
-		elseif includeDropAll then
-			totalWidth = buttonSize + (padding * 2)
+		if extraButtonCount > 0 and visibleCount > 0 then
+			totalWidth = totalWidth + separatorSize + (buttonSize * extraButtonCount) + (spacing * math.max(0, extraButtonCount - 1))
+		elseif extraButtonCount > 0 then
+			totalWidth = (buttonSize * extraButtonCount) + (spacing * math.max(0, extraButtonCount - 1)) + (padding * 2)
 		end
 		self.autoButton:SetSize(math.max(totalWidth, buttonSize + (padding * 2)), buttonSize + (padding * 2))
 	else
 		-- Vertical: narrow and tall
 		local totalHeight = (buttonSize * visibleCount) + (spacing * math.max(0, visibleCount - 1)) + (padding * 2)
-		if includeDropAll and visibleCount > 0 then
-			totalHeight = totalHeight + separatorSize + buttonSize
-		elseif includeDropAll then
-			totalHeight = buttonSize + (padding * 2)
+		if extraButtonCount > 0 and visibleCount > 0 then
+			totalHeight = totalHeight + separatorSize + (buttonSize * extraButtonCount) + (spacing * math.max(0, extraButtonCount - 1))
+		elseif extraButtonCount > 0 then
+			totalHeight = (buttonSize * extraButtonCount) + (spacing * math.max(0, extraButtonCount - 1)) + (padding * 2)
 		end
 		self.autoButton:SetSize(buttonSize + (padding * 2), math.max(totalHeight, buttonSize + (padding * 2)))
 	end
@@ -8091,9 +8244,16 @@ function ShamanPower:UpdateMiniTotemBar()
 					totemButton:SetAttribute("spell1", spellName)
 				end
 
-				-- Right-click to cast Totemic Call (destroys all totems)
-				totemButton:SetAttribute("type2", "spell")
-				totemButton:SetAttribute("spell2", GetSpellInfo(36936))  -- Totemic Call
+				-- Right-click behavior: Totemic Call by default, or flyout trigger if option enabled
+				if self.opt.showTotemFlyouts and self.opt.flyoutRequiresClick then
+					-- Right-click shows flyout instead of Totemic Call
+					totemButton:SetAttribute("type2", nil)
+					totemButton:SetAttribute("spell2", nil)
+				else
+					-- Right-click to cast Totemic Call (destroys all totems)
+					totemButton:SetAttribute("type2", "spell")
+					totemButton:SetAttribute("spell2", GetSpellInfo(36936))  -- Totemic Call
+				end
 			end  -- end of else (visible)
 		end  -- end of if totemButton
 	end  -- end of for loop
@@ -8105,14 +8265,23 @@ function ShamanPower:UpdateMiniTotemBar()
 		separator:SetColorTexture(0.5, 0.5, 0.5, 0.8)  -- Gray line
 	end
 
-	-- Reposition the Drop All button (after the separator)
+	-- Reposition the Drop All button and Totemic Call button (after the separator)
 	local dropAllButton = _G["ShamanPowerAutoDropAll"]
+	local totemicCallButton = _G["ShamanPowerAutoTotemicCall"]
 
-	-- Position Drop All button (only if not popped out)
-	if dropAllPoppedOut then
-		-- Drop All is popped out - hide separator, don't reposition button
-		separator:Hide()
-	elseif showDropAll and visibleCount > 0 then
+	-- Set up Totemic Call button spell if needed (only needs to be done once)
+	if totemicCallButton and showTotemicCall then
+		self:SetupTotemicCallButton()
+	end
+
+	-- Calculate how many extra buttons will be shown (after separator)
+	local showDropAllHere = showDropAll and not dropAllPoppedOut
+	local extraButtonsShown = 0
+	if showDropAllHere then extraButtonsShown = extraButtonsShown + 1 end
+	if showTotemicCall then extraButtonsShown = extraButtonsShown + 1 end
+
+	-- Position extra buttons (Drop All and Totemic Call)
+	if extraButtonsShown > 0 and visibleCount > 0 then
 		separator:ClearAllPoints()
 		if isHorizontal then
 			-- Vertical separator line
@@ -8127,32 +8296,77 @@ function ShamanPower:UpdateMiniTotemBar()
 		end
 		separator:Show()
 
-		if dropAllButton then
+		-- Base position after separator
+		local extraPos = 0
+
+		-- Position Drop All button first (if shown)
+		if showDropAllHere and dropAllButton then
 			dropAllButton:ClearAllPoints()
 			if isHorizontal then
-				-- Horizontal: Drop All is after the separator
-				local dropAllX = padding + (buttonSize * visibleCount) + (spacing * math.max(0, visibleCount - 1)) + separatorSize
+				local dropAllX = padding + (buttonSize * visibleCount) + (spacing * math.max(0, visibleCount - 1)) + separatorSize + (extraPos * (buttonSize + spacing))
 				dropAllButton:SetPoint("TOPLEFT", self.autoButton, "TOPLEFT", dropAllX, -padding)
 			else
-				-- Vertical: Drop All is below the separator
-				local dropAllY = -padding - (buttonSize * visibleCount) - (spacing * math.max(0, visibleCount - 1)) - separatorSize
+				local dropAllY = -padding - (buttonSize * visibleCount) - (spacing * math.max(0, visibleCount - 1)) - separatorSize - (extraPos * (buttonSize + spacing))
 				dropAllButton:SetPoint("TOPLEFT", self.autoButton, "TOPLEFT", padding, dropAllY)
 			end
 			dropAllButton:Show()
+			extraPos = extraPos + 1
+		elseif dropAllButton then
+			dropAllButton:Hide()
 		end
-	elseif showDropAll and visibleCount == 0 then
-		-- Show only Drop All button when all totems are hidden
+
+		-- Position Totemic Call button (if shown)
+		if showTotemicCall and totemicCallButton then
+			totemicCallButton:ClearAllPoints()
+			if isHorizontal then
+				local tcX = padding + (buttonSize * visibleCount) + (spacing * math.max(0, visibleCount - 1)) + separatorSize + (extraPos * (buttonSize + spacing))
+				totemicCallButton:SetPoint("TOPLEFT", self.autoButton, "TOPLEFT", tcX, -padding)
+			else
+				local tcY = -padding - (buttonSize * visibleCount) - (spacing * math.max(0, visibleCount - 1)) - separatorSize - (extraPos * (buttonSize + spacing))
+				totemicCallButton:SetPoint("TOPLEFT", self.autoButton, "TOPLEFT", padding, tcY)
+			end
+			totemicCallButton:Show()
+		elseif totemicCallButton then
+			totemicCallButton:Hide()
+		end
+
+	elseif extraButtonsShown > 0 and visibleCount == 0 then
+		-- Show only extra buttons when all totems are hidden
 		separator:Hide()
-		if dropAllButton then
+		local extraPos = 0
+
+		if showDropAllHere and dropAllButton then
 			dropAllButton:ClearAllPoints()
-			dropAllButton:SetPoint("TOPLEFT", self.autoButton, "TOPLEFT", padding, -padding)
+			if isHorizontal then
+				dropAllButton:SetPoint("TOPLEFT", self.autoButton, "TOPLEFT", padding + (extraPos * (buttonSize + spacing)), -padding)
+			else
+				dropAllButton:SetPoint("TOPLEFT", self.autoButton, "TOPLEFT", padding, -padding - (extraPos * (buttonSize + spacing)))
+			end
 			dropAllButton:Show()
+			extraPos = extraPos + 1
+		elseif dropAllButton then
+			dropAllButton:Hide()
+		end
+
+		if showTotemicCall and totemicCallButton then
+			totemicCallButton:ClearAllPoints()
+			if isHorizontal then
+				totemicCallButton:SetPoint("TOPLEFT", self.autoButton, "TOPLEFT", padding + (extraPos * (buttonSize + spacing)), -padding)
+			else
+				totemicCallButton:SetPoint("TOPLEFT", self.autoButton, "TOPLEFT", padding, -padding - (extraPos * (buttonSize + spacing)))
+			end
+			totemicCallButton:Show()
+		elseif totemicCallButton then
+			totemicCallButton:Hide()
 		end
 	else
-		-- Hide separator and Drop All button
+		-- Hide separator and extra buttons
 		separator:Hide()
 		if dropAllButton then
 			dropAllButton:Hide()
+		end
+		if totemicCallButton then
+			totemicCallButton:Hide()
 		end
 	end
 
@@ -9342,12 +9556,17 @@ function ShamanPower:RepositionEarthShieldButton()
 	local spacing = self.opt.totemBarPadding or 2
 	local showDropAll = self.opt.showDropAllButton ~= false
 	local dropAllPoppedOut = self:IsDropAllPoppedOut()
+	local showTotemicCall = self.opt.totemicCallOnTotemBar and self.opt.cdbarShowRecall ~= false
 
-	-- Find the anchor point - either Drop All button or last visible totem button
+	-- Find the anchor point - Totemic Call > Drop All > last visible totem button
 	local anchorFrame = nil
+	local totemicCallBtn = _G["ShamanPowerAutoTotemicCall"]
 	local dropAllBtn = _G["ShamanPowerAutoDropAll"]
 
-	if showDropAll and dropAllBtn and dropAllBtn:IsShown() and not dropAllPoppedOut then
+	-- First check Totemic Call (it's positioned after Drop All)
+	if showTotemicCall and totemicCallBtn and totemicCallBtn:IsShown() then
+		anchorFrame = totemicCallBtn
+	elseif showDropAll and dropAllBtn and dropAllBtn:IsShown() and not dropAllPoppedOut then
 		-- Anchor to Drop All button (only if not popped out)
 		anchorFrame = dropAllBtn
 	else
@@ -9665,6 +9884,159 @@ function ShamanPower:DropAllTooltip(button)
 		GameTooltip:AddLine("|cff00ccffMiddle-click:|r Pop out", 1, 1, 1)
 	end
 	GameTooltip:Show()
+end
+
+-- Tooltip for Totemic Call button
+function ShamanPower:TotemicCallTooltip(button)
+	if not self.opt.ShowTooltips then return end
+	GameTooltip:SetOwner(button, "ANCHOR_RIGHT")
+	GameTooltip:SetSpellByID(36936)  -- Totemic Call
+	GameTooltip:AddLine(" ")
+	GameTooltip:AddLine("|cff888888Recalls all active totems|r", 1, 1, 1)
+	GameTooltip:Show()
+end
+
+-- Set up Totemic Call button (from XML: ShamanPowerAutoTotemicCall)
+function ShamanPower:SetupTotemicCallButton()
+	local btn = _G["ShamanPowerAutoTotemicCall"]
+	if not btn then return end
+
+	-- Set up spell casting (Totemic Call)
+	local spellName = GetSpellInfo(36936)
+	if spellName and not InCombatLockdown() then
+		btn:RegisterForClicks("AnyUp", "AnyDown")
+		btn:SetAttribute("type1", "spell")
+		btn:SetAttribute("spell1", spellName)
+	end
+
+	-- Update icon texture
+	local iconTexture = btn.icon or _G["ShamanPowerAutoTotemicCallIcon"]
+	if iconTexture then
+		local _, _, icon = GetSpellInfo(36936)
+		if icon then
+			iconTexture:SetTexture(icon)
+		end
+	end
+end
+
+-- Update Totemic Call button opacity based on whether totems are active
+function ShamanPower:UpdateTotemicCallOpacity()
+	local btn = _G["ShamanPowerAutoTotemicCall"]
+	if not btn or not btn:IsShown() then return end
+
+	local fullWhenActive = self.opt.cooldownBarFullOpacityWhenActive
+
+	if fullWhenActive then
+		-- Check if any totems are placed
+		local hasTotem = false
+		for slot = 1, 4 do
+			local haveTotem = GetTotemInfo(slot)
+			if haveTotem then
+				hasTotem = true
+				break
+			end
+		end
+		-- When active, ignore parent alpha so button is fully visible
+		if hasTotem then
+			btn:SetIgnoreParentAlpha(true)
+			btn:SetAlpha(1.0)
+		else
+			btn:SetIgnoreParentAlpha(false)
+			btn:SetAlpha(1.0)  -- Inherit parent opacity
+		end
+	else
+		btn:SetIgnoreParentAlpha(false)
+		btn:SetAlpha(1.0)  -- Inherit parent opacity
+	end
+end
+
+-- ============================================================================
+-- TOTEMIC CALL BUTTON (on totem bar, optional) - Legacy dynamic version
+-- ============================================================================
+
+function ShamanPower:CreateTotemicCallButton()
+	if self.totemicCallButton then return self.totemicCallButton end
+	if not self.autoButton then return nil end
+
+	-- Create secure button for Totemic Call
+	local btn = CreateFrame("Button", "ShamanPowerTotemicCall", self.autoButton, "SecureActionButtonTemplate")
+	btn:SetSize(26, 26)
+	btn:SetFrameLevel(self.autoButton:GetFrameLevel() + 10)
+	btn:RegisterForClicks("AnyUp", "AnyDown")
+	btn:Hide()
+
+	-- Icon
+	local icon = btn:CreateTexture(nil, "ARTWORK")
+	icon:SetAllPoints()
+	icon:SetTexture(GetSpellTexture(36936))  -- Totemic Call icon
+	icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+	btn.icon = icon
+
+	-- Border
+	local border = btn:CreateTexture(nil, "OVERLAY")
+	border:SetPoint("TOPLEFT", -1, 1)
+	border:SetPoint("BOTTOMRIGHT", 1, -1)
+	border:SetTexture("Interface\\Buttons\\UI-ActionButton-Border")
+	border:SetBlendMode("ADD")
+	border:SetVertexColor(0.6, 0.6, 0.6, 0.5)
+	btn.border = border
+
+	-- Highlight
+	local highlight = btn:CreateTexture(nil, "HIGHLIGHT")
+	highlight:SetAllPoints()
+	highlight:SetColorTexture(1, 1, 1, 0.2)
+
+	-- Set up spell casting
+	local spellName = GetSpellInfo(36936)
+	if spellName then
+		btn:SetAttribute("type1", "spell")
+		btn:SetAttribute("spell1", spellName)
+	end
+
+	-- Cooldown frame
+	local cooldown = CreateFrame("Cooldown", "ShamanPowerTotemicCallCD", btn, "CooldownFrameTemplate")
+	cooldown:SetAllPoints()
+	btn.cooldown = cooldown
+
+	-- Tooltip
+	btn:SetScript("OnEnter", function(self)
+		if not ShamanPower.opt.ShowTooltips then return end
+		GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+		GameTooltip:SetSpellByID(36936)
+		GameTooltip:AddLine(" ")
+		GameTooltip:AddLine("|cff888888Recalls all active totems|r", 1, 1, 1)
+		GameTooltip:Show()
+	end)
+	btn:SetScript("OnLeave", function(self)
+		GameTooltip:Hide()
+	end)
+
+	self.totemicCallButton = btn
+	return btn
+end
+
+function ShamanPower:UpdateTotemicCallButton()
+	local showOnTotemBar = self.opt.totemicCallOnTotemBar and self.opt.cdbarShowRecall ~= false
+
+	if showOnTotemBar then
+		if not self.totemicCallButton then
+			self:CreateTotemicCallButton()
+		end
+
+		if self.totemicCallButton then
+			-- Update cooldown display
+			local start, duration = GetSpellCooldown(36936)
+			if start and start > 0 and duration > 1.5 then
+				self.totemicCallButton.cooldown:SetCooldown(start, duration)
+			else
+				self.totemicCallButton.cooldown:Clear()
+			end
+		end
+	else
+		if self.totemicCallButton then
+			self.totemicCallButton:Hide()
+		end
+	end
 end
 
 function ShamanPower:PerformCycle(name, class, skipzero)
@@ -10094,6 +10466,7 @@ end
 
 -- Called when talents change (respec, dual spec switch, etc.)
 function ShamanPower:OnTalentsChanged()
+	if not isShaman then return end
 	if InCombatLockdown() then
 		-- Queue for after combat
 		self.talentChangePending = true
@@ -10304,6 +10677,11 @@ function ShamanPower:PLAYER_ENTERING_WORLD()
 	self:UpdateLayout()
 	self:UpdateRoster()
 	self:ReportChannels()
+
+	-- Apply flyout click mode setting after layout is set up
+	C_Timer.After(0.5, function()
+		self:UpdateTotemFlyoutEnabled()
+	end)
 
 	-- Initialize raid cooldowns and show caller buttons if assigned
 	C_Timer.After(1.0, function()
@@ -13645,6 +14023,10 @@ function ShamanPower:GetCooldownButtonByCooldownType(cooldownType)
 	if cooldownType == 7 then
 		-- Weapon imbue button
 		return self.weaponImbueButton
+	end
+	-- Totemic Call (cooldownType 2) - check if it's on the totem bar instead
+	if cooldownType == 2 and self.opt.totemicCallOnTotemBar then
+		return _G["ShamanPowerAutoTotemicCall"]
 	end
 	if not self.cooldownButtons then return nil end
 	for _, btn in ipairs(self.cooldownButtons) do

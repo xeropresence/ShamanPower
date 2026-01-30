@@ -4,7 +4,7 @@
 <!-- Parent totem button: parented to UIParent, enables combat flyouts -->
 <!-- NOTE: No ActionButtonTemplate - just secure templates to avoid visual clutter -->
 	<Button name="SPTotemButtonTemplate" virtual="true" frameStrata="MEDIUM"
-		inherits="SecureActionButtonTemplate, SecureHandlerEnterLeaveTemplate, SecureHandlerAttributeTemplate, SecureHandlerBaseTemplate">
+		inherits="SecureActionButtonTemplate, SecureHandlerEnterLeaveTemplate, SecureHandlerAttributeTemplate, SecureHandlerMouseUpDownTemplate, SecureHandlerBaseTemplate">
 		<Size x="26" y="26"/>
 		<Layers>
 			<Layer level="ARTWORK">
@@ -290,6 +290,28 @@
 					<OnEnter>ShamanPower:DropAllTooltip(self)</OnEnter>
 					<OnLeave>GameTooltip:Hide()</OnLeave>
 					<PostClick>ShamanPower:AdvanceDropAllTotem(self, button, down)</PostClick>
+				</Scripts>
+			</Button>
+			<!-- Totemic Call Button - recalls all totems (optional, shown when "Recall on Totem Bar" is enabled) -->
+			<Button name = "$parentTotemicCall" inherits = "SecureActionButtonTemplate">
+				<Size>
+					<AbsDimension x = "26" y = "26"/>
+				</Size>
+				<Anchors>
+					<Anchor point = "TOP" relativeTo = "$parentDropAll" relativePoint = "BOTTOM">
+						<Offset>
+							<AbsDimension x = "0" y = "-2"/>
+						</Offset>
+					</Anchor>
+				</Anchors>
+				<Layers>
+					<Layer level = "ARTWORK">
+						<Texture name = "$parentIcon" file = "Interface\Icons\Spell_Shaman_TotemRecall" setAllPoints = "true"/>
+					</Layer>
+				</Layers>
+				<Scripts>
+					<OnEnter>ShamanPower:TotemicCallTooltip(self)</OnEnter>
+					<OnLeave>GameTooltip:Hide()</OnLeave>
 				</Scripts>
 			</Button>
 		</Frames>

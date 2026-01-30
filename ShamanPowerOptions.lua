@@ -173,7 +173,30 @@ ShamanPower.options = {
 							name = "|cff888888Normal Mode: Right-click a totem in the flyout to assign it, then left-click to cast.\nDynamic Mode: Any totem you drop becomes the active button for that element.|r",
 							type = "description",
 							width = "full",
-						}
+						},
+						activeAsMainSpacer = {
+							order = 3,
+							type = "description",
+							name = " ",
+							width = "full",
+						},
+						activeTotemAsMain = {
+							order = 4,
+							name = "TotemTimers Style Display",
+							desc = "When you drop a different totem than assigned, show the ACTIVE totem as the main icon with the ASSIGNED totem as a small indicator in the corner. (Default shows active totem in a separate frame above the button)",
+							type = "toggle",
+							width = "full",
+							disabled = function(info)
+								return ShamanPower.opt.enabled == false
+							end,
+							get = function(info)
+								return ShamanPower.opt.activeTotemAsMain
+							end,
+							set = function(info, val)
+								ShamanPower.opt.activeTotemAsMain = val
+								ShamanPower:UpdateActiveTotemOverlays()
+							end
+						},
 					}
 				},
 				settings_visibility = {
@@ -468,7 +491,9 @@ ShamanPower.options = {
 							end,
 							set = function(info, val)
 								ShamanPower.opt.showDropAllButton = val
-								ShamanPower:UpdateRoster()
+								if not InCombatLockdown() then
+									ShamanPower:UpdateMiniTotemBar()
+								end
 							end
 						},
 						show_cooldown_bar = {
@@ -1013,6 +1038,23 @@ ShamanPower.options = {
 								ShamanPower.opt.swapFlyoutClickButtons = val
 								-- Just update click attributes on existing buttons
 								ShamanPower:UpdateFlyoutClickBehavior()
+							end
+						},
+						flyout_requires_click = {
+							order = 3,
+							type = "toggle",
+							name = "Flyout Requires Right-Click",
+							desc = "Flyouts only appear when you right-click the totem button instead of on mouseover. Right-click the flyout totem to assign it. Note: Disables right-click to destroy totems.",
+							width = "full",
+							disabled = function(info)
+								return ShamanPower.opt.enabled == false or not isShaman or not ShamanPower.opt.showTotemFlyouts
+							end,
+							get = function(info)
+								return ShamanPower.opt.flyoutRequiresClick
+							end,
+							set = function(info, val)
+								ShamanPower.opt.flyoutRequiresClick = val
+								ShamanPower:UpdateTotemFlyoutEnabled()
 							end
 						},
 					}
@@ -2747,16 +2789,16 @@ ShamanPower.options = {
 					type = "group",
 					args = {
 						cdbar_items_desc = {
-							order = -1,
+							order = 0,
 							type = "description",
-							name = "Choose which buttons appear on the cooldown bar.",
+							name = "Choose which buttons appear on the cooldown bar.\n",
 						},
 						show_cooldown_bar = {
-							order = 0,
+							order = 1,
 							type = "toggle",
-							name = "Show Cooldown Bar",
-							desc = "[Enable/Disable] Show a cooldown tracker bar (Shields, Ankh, Nature's Swiftness, etc.)",
-							width = 1.3,
+							name = "Enable Cooldown Bar",
+							desc = "Show a cooldown tracker bar with shields, ankh, nature's swiftness, etc.",
+							width = "full",
 							get = function(info)
 								return ShamanPower.opt.showCooldownBar
 							end,
@@ -2765,15 +2807,19 @@ ShamanPower.options = {
 								ShamanPower:UpdateCooldownBar()
 							end
 						},
+						cdbar_spacer1 = {
+							order = 1.5,
+							type = "description",
+							name = " ",
+							hidden = function() return not ShamanPower.opt.showCooldownBar end,
+						},
 						cdbar_show_shields = {
-							order = 1,
-							hidden = function(info)
-								return not ShamanPower.opt.showCooldownBar
-							end,
+							order = 2,
 							type = "toggle",
-							name = "Shields",
+							name = "Shields (Lightning/Water Shield)",
 							desc = "Show Lightning/Water Shield button on cooldown bar",
-							width = 0.6,
+							width = "full",
+							hidden = function() return not ShamanPower.opt.showCooldownBar end,
 							get = function(info)
 								return ShamanPower.opt.cdbarShowShields ~= false
 							end,
@@ -2785,14 +2831,12 @@ ShamanPower.options = {
 							end
 						},
 						cdbar_show_recall = {
-							order = 2,
+							order = 3,
 							type = "toggle",
-							name = "Recall",
-							desc = "Show Totemic Call button on cooldown bar",
-							width = 0.5,
-							hidden = function(info)
-								return not ShamanPower.opt.showCooldownBar
-							end,
+							name = "Totemic Call (Recall Totems)",
+							desc = "Show Totemic Call button",
+							width = "full",
+							hidden = function() return not ShamanPower.opt.showCooldownBar end,
 							get = function(info)
 								return ShamanPower.opt.cdbarShowRecall ~= false
 							end,
@@ -2800,18 +2844,37 @@ ShamanPower.options = {
 								ShamanPower.opt.cdbarShowRecall = val
 								if not InCombatLockdown() then
 									ShamanPower:RecreateCooldownBar()
+									ShamanPower:UpdateMiniTotemBar()
+								end
+							end
+						},
+						cdbar_recall_on_totembar = {
+							order = 3.5,
+							type = "toggle",
+							name = "    |cff888888-> Show on Totem Bar instead|r",
+							desc = "Move Totemic Call button to the totem bar instead of cooldown bar",
+							width = "full",
+							hidden = function()
+								return not ShamanPower.opt.showCooldownBar or ShamanPower.opt.cdbarShowRecall == false
+							end,
+							get = function(info)
+								return ShamanPower.opt.totemicCallOnTotemBar
+							end,
+							set = function(info, val)
+								ShamanPower.opt.totemicCallOnTotemBar = val
+								if not InCombatLockdown() then
+									ShamanPower:RecreateCooldownBar()
+									ShamanPower:UpdateMiniTotemBar()
 								end
 							end
 						},
 						cdbar_show_reincarnation = {
-							order = 3,
+							order = 4,
 							type = "toggle",
-							name = "Ankh",
+							name = "Reincarnation (Ankh)",
 							desc = "Show Reincarnation cooldown on cooldown bar",
-							width = 0.5,
-							hidden = function(info)
-								return not ShamanPower.opt.showCooldownBar
-							end,
+							width = "full",
+							hidden = function() return not ShamanPower.opt.showCooldownBar end,
 							get = function(info)
 								return ShamanPower.opt.cdbarShowReincarnation ~= false
 							end,
@@ -2823,14 +2886,12 @@ ShamanPower.options = {
 							end
 						},
 						cdbar_show_ns = {
-							order = 4,
+							order = 5,
 							type = "toggle",
-							name = "NS",
+							name = "Nature's Swiftness",
 							desc = "Show Nature's Swiftness cooldown on cooldown bar",
-							width = 0.4,
-							hidden = function(info)
-								return not ShamanPower.opt.showCooldownBar
-							end,
+							width = "full",
+							hidden = function() return not ShamanPower.opt.showCooldownBar end,
 							get = function(info)
 								return ShamanPower.opt.cdbarShowNS ~= false
 							end,
@@ -2842,14 +2903,12 @@ ShamanPower.options = {
 							end
 						},
 						cdbar_show_manatide = {
-							order = 5,
+							order = 6,
 							type = "toggle",
-							name = "Mana Tide",
+							name = "Mana Tide Totem",
 							desc = "Show Mana Tide Totem cooldown on cooldown bar",
-							width = 0.6,
-							hidden = function(info)
-								return not ShamanPower.opt.showCooldownBar
-							end,
+							width = "full",
+							hidden = function() return not ShamanPower.opt.showCooldownBar end,
 							get = function(info)
 								return ShamanPower.opt.cdbarShowManaTide ~= false
 							end,
@@ -2861,14 +2920,12 @@ ShamanPower.options = {
 							end
 						},
 						cdbar_show_shamanistic_rage = {
-							order = 5.5,
+							order = 7,
 							type = "toggle",
-							name = "Sham Rage",
+							name = "Shamanistic Rage",
 							desc = "Show Shamanistic Rage cooldown on cooldown bar (Enhancement talent)",
-							width = 0.65,
-							hidden = function(info)
-								return not ShamanPower.opt.showCooldownBar
-							end,
+							width = "full",
+							hidden = function() return not ShamanPower.opt.showCooldownBar end,
 							get = function(info)
 								return ShamanPower.opt.cdbarShowShamanisticRage ~= false
 							end,
@@ -2880,14 +2937,12 @@ ShamanPower.options = {
 							end
 						},
 						cdbar_show_bloodlust = {
-							order = 6,
+							order = 8,
 							type = "toggle",
-							name = "BL/Hero",
+							name = "Bloodlust / Heroism",
 							desc = "Show Bloodlust/Heroism cooldown on cooldown bar",
-							width = 0.55,
-							hidden = function(info)
-								return not ShamanPower.opt.showCooldownBar
-							end,
+							width = "full",
+							hidden = function() return not ShamanPower.opt.showCooldownBar end,
 							get = function(info)
 								return ShamanPower.opt.cdbarShowBloodlust ~= false
 							end,
@@ -2899,14 +2954,12 @@ ShamanPower.options = {
 							end
 						},
 						cdbar_show_imbues = {
-							order = 7,
+							order = 9,
 							type = "toggle",
-							name = "Imbues",
+							name = "Weapon Imbues",
 							desc = "Show Weapon Imbue button on cooldown bar",
-							width = 0.55,
-							hidden = function(info)
-								return not ShamanPower.opt.showCooldownBar
-							end,
+							width = "full",
+							hidden = function() return not ShamanPower.opt.showCooldownBar end,
 							get = function(info)
 								return ShamanPower.opt.cdbarShowImbues ~= false
 							end,
