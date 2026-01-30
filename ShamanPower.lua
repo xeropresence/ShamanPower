@@ -14213,6 +14213,358 @@ SlashCmdList["SPMACROS"] = function()
 	print("Drag them to your action bar - they auto-update when you change assignments!")
 end
 
+-- ============================================================================
+-- ACTION BAR KEYBIND DETECTION SYSTEM
+-- Scans action bars from various addons (Bartender4, Dominos, ElvUI) to find
+-- keybinds for spells, allowing ShamanPower to display keybinds on buttons
+-- even when users bind spells through their action bar addon.
+-- ============================================================================
+
+-- Table to store detected action bar keybinds (keyed by spell name)
+ShamanPower.actionBarKeybinds = {}
+
+-- Detect which action bar addon is active
+function ShamanPower:GetActiveActionBarAddon()
+	if _G["Bartender4"] then
+		return "Bartender4"
+	elseif _G["Dominos"] then
+		return "Dominos"
+	elseif _G["ElvUI"] and _G["ElvUI"][1] and _G["ElvUI"][1].ActionBars then
+		return "ElvUI"
+	end
+	return "Default"
+end
+
+-- Get spell name from an action slot
+local function GetSpellNameFromActionSlot(slot)
+	local actionType, id, subType = GetActionInfo(slot)
+	if actionType == "spell" and id then
+		local spellName = GetSpellInfo(id)
+		return spellName, id
+	elseif actionType == "macro" then
+		-- Check if macro casts a spell we care about
+		local macroSpell = GetMacroSpell(id)
+		if macroSpell then
+			local spellName = GetSpellInfo(macroSpell)
+			return spellName, macroSpell
+		end
+	end
+	return nil, nil
+end
+
+-- Scan Bartender4 action bars
+function ShamanPower:ScanBartender4Keybinds()
+	local keybinds = {}
+
+	-- Bartender4 uses buttons named BT4Button1 through BT4Button120
+	for i = 1, 120 do
+		local btn = _G["BT4Button" .. i]
+		if btn then
+			local slot = btn:GetAttribute("action") or btn.action or i
+			if slot and type(slot) == "number" and slot >= 1 and slot <= 120 then
+				local spellName, spellID = GetSpellNameFromActionSlot(slot)
+				if spellName and not keybinds[spellName] then
+					-- Try to get keybind for this button
+					local bindingString = "CLICK BT4Button" .. i .. ":LeftButton"
+					local key1 = GetBindingKey(bindingString)
+					if not key1 then
+						-- Try alternate binding format
+						bindingString = "CLICK BT4Button" .. i .. ":Keybind"
+						key1 = GetBindingKey(bindingString)
+					end
+					if key1 then
+						keybinds[spellName] = key1
+					end
+				end
+			end
+		end
+	end
+
+	return keybinds
+end
+
+-- Scan Dominos action bars
+function ShamanPower:ScanDominosKeybinds()
+	local keybinds = {}
+
+	-- Dominos uses different button naming based on bar type
+	-- Main action bar: ActionButton1-12
+	-- Bonus bars: MultiBarBottomLeftButton, MultiBarBottomRightButton, etc.
+	-- Dominos custom: DominosActionButton1-120
+
+	-- Scan standard action buttons (slots 1-12)
+	for i = 1, 12 do
+		local slot = i
+		local spellName, spellID = GetSpellNameFromActionSlot(slot)
+		if spellName and not keybinds[spellName] then
+			local key1 = GetBindingKey("ACTIONBUTTON" .. i)
+			if key1 then
+				keybinds[spellName] = key1
+			end
+		end
+	end
+
+	-- Scan MultiBar buttons (slots 13-72)
+	local multiBarMappings = {
+		{prefix = "MULTIACTIONBAR1BUTTON", slotOffset = 72, count = 12},  -- Right bar 1
+		{prefix = "MULTIACTIONBAR2BUTTON", slotOffset = 60, count = 12},  -- Right bar 2
+		{prefix = "MULTIACTIONBAR3BUTTON", slotOffset = 48, count = 12},  -- Bottom left
+		{prefix = "MULTIACTIONBAR4BUTTON", slotOffset = 36, count = 12},  -- Bottom right
+	}
+
+	for _, barInfo in ipairs(multiBarMappings) do
+		for i = 1, barInfo.count do
+			local slot = barInfo.slotOffset + i
+			local spellName, spellID = GetSpellNameFromActionSlot(slot)
+			if spellName and not keybinds[spellName] then
+				local key1 = GetBindingKey(barInfo.prefix .. i)
+				if key1 then
+					keybinds[spellName] = key1
+				end
+			end
+		end
+	end
+
+	-- Scan Dominos-specific buttons
+	for i = 1, 120 do
+		local btn = _G["DominosActionButton" .. i]
+		if btn then
+			local slot = btn:GetAttribute("action") or i
+			if slot and type(slot) == "number" and slot >= 1 and slot <= 120 then
+				local spellName, spellID = GetSpellNameFromActionSlot(slot)
+				if spellName and not keybinds[spellName] then
+					local bindingString = "CLICK DominosActionButton" .. i .. ":LeftButton"
+					local key1 = GetBindingKey(bindingString)
+					if key1 then
+						keybinds[spellName] = key1
+					end
+				end
+			end
+		end
+	end
+
+	return keybinds
+end
+
+-- Scan ElvUI action bars
+function ShamanPower:ScanElvUIKeybinds()
+	local keybinds = {}
+
+	-- ElvUI action buttons are named ElvUI_Bar1Button1, ElvUI_Bar2Button1, etc.
+	for bar = 1, 10 do
+		for i = 1, 12 do
+			local btnName = "ElvUI_Bar" .. bar .. "Button" .. i
+			local btn = _G[btnName]
+			if btn then
+				local slot = btn:GetAttribute("action") or btn.action
+				if slot and type(slot) == "number" and slot >= 1 and slot <= 120 then
+					local spellName, spellID = GetSpellNameFromActionSlot(slot)
+					if spellName and not keybinds[spellName] then
+						-- ElvUI stores bindstring on buttons
+						local bindstring = btn.bindstring
+						if bindstring then
+							local key1 = GetBindingKey(bindstring)
+							if key1 then
+								keybinds[spellName] = key1
+							end
+						end
+						-- Try click binding format as fallback
+						if not keybinds[spellName] then
+							local bindingString = "CLICK " .. btnName .. ":LeftButton"
+							local key1 = GetBindingKey(bindingString)
+							if key1 then
+								keybinds[spellName] = key1
+							end
+						end
+					end
+				end
+			end
+		end
+	end
+
+	return keybinds
+end
+
+-- Scan default WoW action bars
+function ShamanPower:ScanDefaultActionBarKeybinds()
+	local keybinds = {}
+
+	-- Main action bar (slots 1-12)
+	for i = 1, 12 do
+		local slot = i
+		local spellName, spellID = GetSpellNameFromActionSlot(slot)
+		if spellName and not keybinds[spellName] then
+			local key1 = GetBindingKey("ACTIONBUTTON" .. i)
+			if key1 then
+				keybinds[spellName] = key1
+			end
+		end
+	end
+
+	-- Bonus action bar / stance bar (slots 73-84 for first page, etc.)
+	for i = 1, 12 do
+		local slot = 72 + i
+		local spellName, spellID = GetSpellNameFromActionSlot(slot)
+		if spellName and not keybinds[spellName] then
+			local key1 = GetBindingKey("ACTIONBUTTON" .. i)
+			if key1 then
+				keybinds[spellName] = key1
+			end
+		end
+	end
+
+	-- Bottom Left MultiBar (MultiBarBottomLeft, slots 61-72)
+	for i = 1, 12 do
+		local slot = 60 + i
+		local spellName, spellID = GetSpellNameFromActionSlot(slot)
+		if spellName and not keybinds[spellName] then
+			local key1 = GetBindingKey("MULTIACTIONBAR1BUTTON" .. i)
+			if key1 then
+				keybinds[spellName] = key1
+			end
+		end
+	end
+
+	-- Bottom Right MultiBar (MultiBarBottomRight, slots 49-60)
+	for i = 1, 12 do
+		local slot = 48 + i
+		local spellName, spellID = GetSpellNameFromActionSlot(slot)
+		if spellName and not keybinds[spellName] then
+			local key1 = GetBindingKey("MULTIACTIONBAR2BUTTON" .. i)
+			if key1 then
+				keybinds[spellName] = key1
+			end
+		end
+	end
+
+	-- Right MultiBar (MultiBarRight, slots 25-36)
+	for i = 1, 12 do
+		local slot = 24 + i
+		local spellName, spellID = GetSpellNameFromActionSlot(slot)
+		if spellName and not keybinds[spellName] then
+			local key1 = GetBindingKey("MULTIACTIONBAR3BUTTON" .. i)
+			if key1 then
+				keybinds[spellName] = key1
+			end
+		end
+	end
+
+	-- Right MultiBar 2 (MultiBarLeft, slots 37-48)
+	for i = 1, 12 do
+		local slot = 36 + i
+		local spellName, spellID = GetSpellNameFromActionSlot(slot)
+		if spellName and not keybinds[spellName] then
+			local key1 = GetBindingKey("MULTIACTIONBAR4BUTTON" .. i)
+			if key1 then
+				keybinds[spellName] = key1
+			end
+		end
+	end
+
+	return keybinds
+end
+
+-- Main function to scan all action bars and populate the keybind lookup table
+function ShamanPower:ScanActionBarKeybinds()
+	local addon = self:GetActiveActionBarAddon()
+	local keybinds = {}
+
+	-- Always scan default bars first (provides fallback)
+	local defaultKeybinds = self:ScanDefaultActionBarKeybinds()
+	for spell, key in pairs(defaultKeybinds) do
+		keybinds[spell] = key
+	end
+
+	-- Then scan addon-specific bars (overwrites default if found)
+	if addon == "Bartender4" then
+		local addonKeybinds = self:ScanBartender4Keybinds()
+		for spell, key in pairs(addonKeybinds) do
+			keybinds[spell] = key
+		end
+	elseif addon == "Dominos" then
+		local addonKeybinds = self:ScanDominosKeybinds()
+		for spell, key in pairs(addonKeybinds) do
+			keybinds[spell] = key
+		end
+	elseif addon == "ElvUI" then
+		local addonKeybinds = self:ScanElvUIKeybinds()
+		for spell, key in pairs(addonKeybinds) do
+			keybinds[spell] = key
+		end
+	end
+
+	self.actionBarKeybinds = keybinds
+end
+
+-- Get keybind for a spell by name (checks action bar keybinds first)
+function ShamanPower:GetKeybindForSpell(spellName)
+	if not spellName then return nil end
+	return self.actionBarKeybinds[spellName]
+end
+
+-- Map ShamanPower button types to their associated spell names
+-- Returns the spell name that should be looked up for action bar keybinds
+function ShamanPower:GetSpellNameForButton(buttonType, element)
+	-- Cooldown bar buttons (cooldownType values)
+	if buttonType == "shield" then
+		-- Check which shield is preferred/active
+		local btn = self.shieldButton
+		if btn and btn.activeShieldID then
+			return GetSpellInfo(btn.activeShieldID)
+		end
+		-- Default to Lightning Shield
+		return GetSpellInfo(324)
+	elseif buttonType == "recall" then
+		return GetSpellInfo(36936)  -- Totemic Call
+	elseif buttonType == "ankh" then
+		return GetSpellInfo(20608)  -- Reincarnation
+	elseif buttonType == "ns" then
+		return GetSpellInfo(16188)  -- Nature's Swiftness
+	elseif buttonType == "manatide" then
+		return GetSpellInfo(16190)  -- Mana Tide Totem
+	elseif buttonType == "bloodlust" then
+		-- Check faction for Bloodlust vs Heroism
+		local faction = UnitFactionGroup("player")
+		if faction == "Alliance" then
+			return GetSpellInfo(32182)  -- Heroism
+		else
+			return GetSpellInfo(2825)  -- Bloodlust
+		end
+	elseif buttonType == "imbue" then
+		-- Get current main hand imbue spell
+		local hasMain, _, _, mainID = GetWeaponEnchantInfo()
+		if hasMain and self.EnchantIDToImbue and self.EnchantIDToImbue[mainID] then
+			local imbueType = self.EnchantIDToImbue[mainID]
+			if self.WeaponImbueSpells and self.WeaponImbueSpells[imbueType] then
+				return GetSpellInfo(self.WeaponImbueSpells[imbueType])
+			end
+		end
+		-- Fallback to last used or Windfury
+		if self.lastMainHandImbue and self.WeaponImbueSpells then
+			return GetSpellInfo(self.WeaponImbueSpells[self.lastMainHandImbue])
+		end
+		return GetSpellInfo(8232)  -- Windfury Weapon default
+	elseif buttonType == "totem" and element then
+		-- Get assigned totem spell for this element
+		local assignments = ShamanPower_Assignments[self.player]
+		if assignments then
+			local totemIndex = assignments[element] or 0
+			if totemIndex > 0 then
+				local spellID = self:GetTotemSpell(element, totemIndex)
+				if spellID then
+					return GetSpellInfo(spellID)
+				end
+			end
+		end
+	elseif buttonType == "dropall" then
+		-- Drop All uses a macro, but we can check for Call of the Elements or similar
+		-- or just return nil since it's not a single spell
+		return nil
+	end
+
+	return nil
+end
+
 -- Convert a key binding to a short display string
 local function GetShortKeybindText(key)
 	if not key then return nil end
@@ -14252,10 +14604,34 @@ function ShamanPower:SetupTotemBarKeybindText()
 	end
 end
 
+-- Map totem bar binding names to element index for action bar keybind lookup
+ShamanPower.TotemBarElementMap = {
+	["SHAMANPOWER_EARTH_TOTEM"] = 1,
+	["SHAMANPOWER_FIRE_TOTEM"] = 2,
+	["SHAMANPOWER_WATER_TOTEM"] = 3,
+	["SHAMANPOWER_AIR_TOTEM"] = 4,
+	["SHAMANPOWER_DROPALL"] = nil,  -- Drop All is not a single spell
+}
+
+-- Map cooldownType to button type string for action bar keybind lookup
+ShamanPower.CooldownTypeToButtonType = {
+	[1] = "shield",
+	[2] = "recall",
+	[3] = "ankh",
+	[4] = "ns",
+	[5] = "manatide",
+	[6] = "bloodlust",
+	[7] = "imbue",
+}
+
 -- Update keybind text on all buttons (totem bar + cooldown bar)
+-- Priority: 1) Action bar addon keybind, 2) Default WoW action bar keybind, 3) ShamanPower binding
 function ShamanPower:UpdateButtonKeybindText()
 	-- Set up totem bar keybind text if not already done
 	self:SetupTotemBarKeybindText()
+
+	-- Scan action bars for keybinds (refreshes actionBarKeybinds table)
+	self:ScanActionBarKeybinds()
 
 	if not self.opt.showButtonKeybinds then
 		-- Hide all keybind text if option disabled
@@ -14284,8 +14660,29 @@ function ShamanPower:UpdateButtonKeybindText()
 	for bindingName, buttonName in pairs(self.TotemBarKeybinds) do
 		local btn = _G[buttonName]
 		if btn and btn.keybindText then
-			local key1, key2 = GetBindingKey(bindingName)
-			local keyText = GetShortKeybindText(key1)
+			local keyText = nil
+
+			-- First, try to get keybind from action bar addon
+			local element = self.TotemBarElementMap[bindingName]
+			if element then
+				local spellName = self:GetSpellNameForButton("totem", element)
+				if spellName then
+					local actionBarKey = self:GetKeybindForSpell(spellName)
+					if actionBarKey then
+						keyText = GetShortKeybindText(actionBarKey)
+					end
+				end
+			elseif bindingName == "SHAMANPOWER_DROPALL" then
+				-- Drop All could be bound via macro - skip action bar lookup
+				-- (user would need to bind the SP_DropAll macro on their bar)
+			end
+
+			-- Fallback to ShamanPower-specific binding
+			if not keyText then
+				local key1, key2 = GetBindingKey(bindingName)
+				keyText = GetShortKeybindText(key1)
+			end
+
 			if keyText then
 				btn.keybindText:SetText(keyText)
 				btn.keybindText:Show()
@@ -14300,8 +14697,26 @@ function ShamanPower:UpdateButtonKeybindText()
 	for bindingName, cooldownType in pairs(self.CooldownBarKeybinds) do
 		local btn = self:GetCooldownButtonByCooldownType(cooldownType)
 		if btn and btn.keybindText then
-			local key1, key2 = GetBindingKey(bindingName)
-			local keyText = GetShortKeybindText(key1)
+			local keyText = nil
+
+			-- First, try to get keybind from action bar addon
+			local buttonType = self.CooldownTypeToButtonType[cooldownType]
+			if buttonType then
+				local spellName = self:GetSpellNameForButton(buttonType)
+				if spellName then
+					local actionBarKey = self:GetKeybindForSpell(spellName)
+					if actionBarKey then
+						keyText = GetShortKeybindText(actionBarKey)
+					end
+				end
+			end
+
+			-- Fallback to ShamanPower-specific binding
+			if not keyText then
+				local key1, key2 = GetBindingKey(bindingName)
+				keyText = GetShortKeybindText(key1)
+			end
+
 			if keyText then
 				btn.keybindText:SetText(keyText)
 				btn.keybindText:Show()
@@ -14309,6 +14724,34 @@ function ShamanPower:UpdateButtonKeybindText()
 				btn.keybindText:SetText("")
 				btn.keybindText:Hide()
 			end
+		end
+	end
+
+	-- Update keybind text for weapon imbue button
+	if self.weaponImbueButton and self.weaponImbueButton.keybindText then
+		local keyText = nil
+
+		-- Try to get keybind from action bar addon for current imbue spell
+		local spellName = self:GetSpellNameForButton("imbue")
+		if spellName then
+			local actionBarKey = self:GetKeybindForSpell(spellName)
+			if actionBarKey then
+				keyText = GetShortKeybindText(actionBarKey)
+			end
+		end
+
+		-- Fallback to ShamanPower-specific binding
+		if not keyText then
+			local key1, key2 = GetBindingKey("SHAMANPOWER_CD_IMBUE")
+			keyText = GetShortKeybindText(key1)
+		end
+
+		if keyText then
+			self.weaponImbueButton.keybindText:SetText(keyText)
+			self.weaponImbueButton.keybindText:Show()
+		else
+			self.weaponImbueButton.keybindText:SetText("")
+			self.weaponImbueButton.keybindText:Hide()
 		end
 	end
 end
@@ -14370,7 +14813,17 @@ local keybindEventFrame = CreateFrame("Frame")
 keybindEventFrame:RegisterEvent("UPDATE_BINDINGS")
 keybindEventFrame:RegisterEvent("PLAYER_LOGIN")
 keybindEventFrame:RegisterEvent("PLAYER_REGEN_ENABLED")
-keybindEventFrame:SetScript("OnEvent", function(self, event)
+keybindEventFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
+keybindEventFrame:RegisterEvent("ADDON_LOADED")
+
+-- Action bar addons that we want to detect for keybind scanning
+local actionBarAddons = {
+	["Bartender4"] = true,
+	["Dominos"] = true,
+	["ElvUI"] = true,
+}
+
+keybindEventFrame:SetScript("OnEvent", function(self, event, arg1)
 	-- If leaving combat, check if we have pending keybind or macro setup
 	if event == "PLAYER_REGEN_ENABLED" then
 		if ShamanPower.keybindsPending then
@@ -14404,6 +14857,27 @@ keybindEventFrame:SetScript("OnEvent", function(self, event)
 			ShamanPower:UpdateTotemButtons()
 		end
 		return
+	end
+
+	-- When an action bar addon loads, rescan keybinds after a delay
+	if event == "ADDON_LOADED" and actionBarAddons[arg1] then
+		-- Delay to allow addon to fully initialize
+		C_Timer.After(1.0, function()
+			if ShamanPower.UpdateButtonKeybindText then
+				ShamanPower:UpdateButtonKeybindText()
+			end
+		end)
+		return
+	end
+
+	-- When entering world, refresh action bar keybind scan
+	if event == "PLAYER_ENTERING_WORLD" then
+		-- Delay to allow action bars to be set up
+		C_Timer.After(2.0, function()
+			if ShamanPower.UpdateButtonKeybindText then
+				ShamanPower:UpdateButtonKeybindText()
+			end
+		end)
 	end
 
 	-- Delay slightly to ensure buttons exist

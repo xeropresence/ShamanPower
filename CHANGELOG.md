@@ -1,5 +1,17 @@
 # ShamanPower Changelog
 
+## [v1.5.3](https://github.com/taubut/ShamanPower/releases/tag/v1.5.3) (2026-01-30)
+
+### New Features
+- **Action Bar Addon Keybind Detection**: "Show Keybinds on Buttons" now detects keybinds from action bar addons
+  - Supports Bartender4, Dominos, and ElvUI action bars
+  - Scans action bars for spells and displays their keybinds on ShamanPower buttons
+  - Works for totem buttons, cooldown bar buttons, and weapon imbue button
+  - Falls back to ShamanPower-specific bindings if no action bar keybind found
+  - Automatically rescans when action bar addons load or when entering world
+
+*Thanks to SexualRhinoceros from the Shaman Discord for contributing this feature!*
+
 ## [v1.5.2](https://github.com/taubut/ShamanPower/releases/tag/v1.5.2) (2026-01-30)
 
 ### New Features
