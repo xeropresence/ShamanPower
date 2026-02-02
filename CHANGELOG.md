@@ -1,5 +1,28 @@
 # ShamanPower Changelog
 
+## [v1.5.6](https://github.com/taubut/ShamanPower/releases/tag/v1.5.6) (2026-02-02)
+
+### New Features
+- **Totem Twisting option in Settings**: Added "Enable Totem Twisting" toggle to Settings > Totem Bar Mode (same as the checkbox in /sp totems, now also accessible in the options panel)
+- **Twist Timer: Hide Decimals**: New sub-option (shown when twisting is enabled) to show whole seconds only on the twist countdown (e.g., "8" instead of "8.3")
+- **Totem Cooldown Display**: Show cooldown swipe and remaining time on totems that have cooldowns
+  - Displays on both the main totem button and in the flyout menu
+  - Affects totems with cooldowns: Grounding Totem, Mana Tide Totem, Stoneclaw Totem, Fire Nova Totem, Earth Elemental, Fire Elemental
+  - Shows cooldown swipe animation plus countdown text (minutes or seconds)
+  - Enabled by default - can be toggled in Look & Feel > Totem Bar > "Show Totem Cooldowns"
+- **Totem Flyout Customization**: New "Totem Flyouts" section in Look & Feel
+  - Enable/disable individual totems from appearing in flyout menus
+  - Organized by element (Earth, Fire, Water, Air) with colored headers
+  - Hide totems you never use to keep your flyouts cleaner
+  - All totems enabled by default
+
+### Bug Fixes
+- **TotemTimers style + Twisting fix**: Fixed Air totem icon rapidly flickering when both "TotemTimers Style Display" and "Twist" options are enabled
+  - Now correctly shows the currently active totem icon (Windfury or Grace of Air) instead of always showing the assigned totem
+- **TotemTimers style flyout fix**: Fixed flyout menu showing wrong totem when using "TotemTimers Style Display"
+  - Previously, the flyout would hide the assigned totem while the main button icon showed the active totem (causing visual confusion like Mana Tide appearing on both the main button and in the flyout)
+  - Now correctly hides the active totem from the flyout, so the totem shown on the main button icon doesn't also appear in the flyout
+
 ## [v1.5.5](https://github.com/taubut/ShamanPower/releases/tag/v1.5.5) (2026-02-02)
 
 ### New Features

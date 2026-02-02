@@ -197,6 +197,60 @@ ShamanPower.options = {
 								ShamanPower:UpdateActiveTotemOverlays()
 							end
 						},
+						twistSpacer = {
+							order = 5,
+							type = "description",
+							name = " ",
+							width = "full",
+						},
+						enableTwisting = {
+							order = 6,
+							name = "Enable Totem Twisting",
+							desc = "Enable Air totem twisting (alternates between Windfury and Grace of Air). This is the same option as the checkbox in /sp totems.",
+							type = "toggle",
+							width = "full",
+							disabled = function(info)
+								return ShamanPower.opt.enabled == false
+							end,
+							get = function(info)
+								return ShamanPower.opt.enableTotemTwisting
+							end,
+							set = function(info, val)
+								ShamanPower.opt.enableTotemTwisting = val
+								-- Sync to assignments table
+								ShamanPower_TwistAssignments = ShamanPower_TwistAssignments or {}
+								ShamanPower_TwistAssignments[ShamanPower.player] = val
+								-- Send to other clients
+								ShamanPower:SendMessage("TWIST " .. ShamanPower.player .. " " .. (val and "1" or "0"))
+								-- Update UI
+								ShamanPower:UpdateMiniTotemBar()
+								ShamanPower:UpdateSPMacros()
+								if val then
+									ShamanPower:SetupTwistTimer()
+								else
+									ShamanPower:HideTwistTimer()
+								end
+							end
+						},
+						twistTimerNoDecimals = {
+							order = 7,
+							name = "Twist Timer: Hide Decimals",
+							desc = "Show whole seconds only on the twist countdown timer instead of decimal values (e.g., '8' instead of '8.3')",
+							type = "toggle",
+							width = "full",
+							hidden = function(info)
+								return not ShamanPower.opt.enableTotemTwisting
+							end,
+							disabled = function(info)
+								return ShamanPower.opt.enabled == false
+							end,
+							get = function(info)
+								return ShamanPower.opt.twistTimerNoDecimals
+							end,
+							set = function(info, val)
+								ShamanPower.opt.twistTimerNoDecimals = val
+							end
+						},
 					}
 				},
 				settings_visibility = {
@@ -4106,6 +4160,20 @@ ShamanPower.options = {
 								ShamanPower:UpdateTotemProgressBars()
 							end
 						},
+						show_totem_cooldowns = {
+							order = 3.7,
+							type = "toggle",
+							name = "Show Totem Cooldowns",
+							desc = "Show cooldown swipe and remaining time on totems that have cooldowns (Grounding, Mana Tide, Elementals, etc). Displays on both the main totem button and in the flyout menu.",
+							width = "full",
+							get = function(info)
+								return ShamanPower.opt.showTotemCooldowns ~= false
+							end,
+							set = function(info, val)
+								ShamanPower.opt.showTotemCooldowns = val
+								ShamanPower:SetupTotemProgressBars()  -- Re-enable/disable the update subsystem
+							end
+						},
 						pulse_bar_position = {
 							order = 4,
 							type = "select",
@@ -4690,6 +4758,366 @@ ShamanPower.options = {
 										ShamanPower:TogglePopOutFrame(key)
 									end
 								end
+							end,
+						},
+					}
+				},
+				totemflyouts_section = {
+					order = 9.5,
+					name = "Totem Flyouts",
+					type = "group",
+					args = {
+						flyouts_desc = {
+							order = 0,
+							type = "description",
+							name = "Choose which totems appear in the flyout menus. Disable totems you never use to keep your flyouts cleaner.\n",
+						},
+						-- Earth Totems
+						earth_header = {
+							order = 1,
+							type = "header",
+							name = "|cff8B4513Earth Totems|r",
+						},
+						earth_strength = {
+							order = 1.1,
+							type = "toggle",
+							name = "Strength of Earth",
+							width = 0.9,
+							get = function() return ShamanPower.opt.flyoutTotems == nil or ShamanPower.opt.flyoutTotems.earth_1 ~= false end,
+							set = function(_, val)
+								ShamanPower.opt.flyoutTotems = ShamanPower.opt.flyoutTotems or {}
+								ShamanPower.opt.flyoutTotems.earth_1 = val
+								ShamanPower:RecreateTotemFlyouts()
+							end,
+						},
+						earth_stoneskin = {
+							order = 1.2,
+							type = "toggle",
+							name = "Stoneskin",
+							width = 0.9,
+							get = function() return ShamanPower.opt.flyoutTotems == nil or ShamanPower.opt.flyoutTotems.earth_2 ~= false end,
+							set = function(_, val)
+								ShamanPower.opt.flyoutTotems = ShamanPower.opt.flyoutTotems or {}
+								ShamanPower.opt.flyoutTotems.earth_2 = val
+								ShamanPower:RecreateTotemFlyouts()
+							end,
+						},
+						earth_tremor = {
+							order = 1.3,
+							type = "toggle",
+							name = "Tremor",
+							width = 0.9,
+							get = function() return ShamanPower.opt.flyoutTotems == nil or ShamanPower.opt.flyoutTotems.earth_3 ~= false end,
+							set = function(_, val)
+								ShamanPower.opt.flyoutTotems = ShamanPower.opt.flyoutTotems or {}
+								ShamanPower.opt.flyoutTotems.earth_3 = val
+								ShamanPower:RecreateTotemFlyouts()
+							end,
+						},
+						earth_earthbind = {
+							order = 1.4,
+							type = "toggle",
+							name = "Earthbind",
+							width = 0.9,
+							get = function() return ShamanPower.opt.flyoutTotems == nil or ShamanPower.opt.flyoutTotems.earth_4 ~= false end,
+							set = function(_, val)
+								ShamanPower.opt.flyoutTotems = ShamanPower.opt.flyoutTotems or {}
+								ShamanPower.opt.flyoutTotems.earth_4 = val
+								ShamanPower:RecreateTotemFlyouts()
+							end,
+						},
+						earth_stoneclaw = {
+							order = 1.5,
+							type = "toggle",
+							name = "Stoneclaw",
+							width = 0.9,
+							get = function() return ShamanPower.opt.flyoutTotems == nil or ShamanPower.opt.flyoutTotems.earth_5 ~= false end,
+							set = function(_, val)
+								ShamanPower.opt.flyoutTotems = ShamanPower.opt.flyoutTotems or {}
+								ShamanPower.opt.flyoutTotems.earth_5 = val
+								ShamanPower:RecreateTotemFlyouts()
+							end,
+						},
+						earth_elemental = {
+							order = 1.6,
+							type = "toggle",
+							name = "Earth Elemental",
+							width = 0.9,
+							get = function() return ShamanPower.opt.flyoutTotems == nil or ShamanPower.opt.flyoutTotems.earth_6 ~= false end,
+							set = function(_, val)
+								ShamanPower.opt.flyoutTotems = ShamanPower.opt.flyoutTotems or {}
+								ShamanPower.opt.flyoutTotems.earth_6 = val
+								ShamanPower:RecreateTotemFlyouts()
+							end,
+						},
+						-- Fire Totems
+						fire_header = {
+							order = 2,
+							type = "header",
+							name = "|cffFF4500Fire Totems|r",
+						},
+						fire_wrath = {
+							order = 2.1,
+							type = "toggle",
+							name = "Totem of Wrath",
+							width = 0.9,
+							get = function() return ShamanPower.opt.flyoutTotems == nil or ShamanPower.opt.flyoutTotems.fire_1 ~= false end,
+							set = function(_, val)
+								ShamanPower.opt.flyoutTotems = ShamanPower.opt.flyoutTotems or {}
+								ShamanPower.opt.flyoutTotems.fire_1 = val
+								ShamanPower:RecreateTotemFlyouts()
+							end,
+						},
+						fire_searing = {
+							order = 2.2,
+							type = "toggle",
+							name = "Searing",
+							width = 0.9,
+							get = function() return ShamanPower.opt.flyoutTotems == nil or ShamanPower.opt.flyoutTotems.fire_2 ~= false end,
+							set = function(_, val)
+								ShamanPower.opt.flyoutTotems = ShamanPower.opt.flyoutTotems or {}
+								ShamanPower.opt.flyoutTotems.fire_2 = val
+								ShamanPower:RecreateTotemFlyouts()
+							end,
+						},
+						fire_magma = {
+							order = 2.3,
+							type = "toggle",
+							name = "Magma",
+							width = 0.9,
+							get = function() return ShamanPower.opt.flyoutTotems == nil or ShamanPower.opt.flyoutTotems.fire_3 ~= false end,
+							set = function(_, val)
+								ShamanPower.opt.flyoutTotems = ShamanPower.opt.flyoutTotems or {}
+								ShamanPower.opt.flyoutTotems.fire_3 = val
+								ShamanPower:RecreateTotemFlyouts()
+							end,
+						},
+						fire_nova = {
+							order = 2.4,
+							type = "toggle",
+							name = "Fire Nova",
+							width = 0.9,
+							get = function() return ShamanPower.opt.flyoutTotems == nil or ShamanPower.opt.flyoutTotems.fire_4 ~= false end,
+							set = function(_, val)
+								ShamanPower.opt.flyoutTotems = ShamanPower.opt.flyoutTotems or {}
+								ShamanPower.opt.flyoutTotems.fire_4 = val
+								ShamanPower:RecreateTotemFlyouts()
+							end,
+						},
+						fire_flametongue = {
+							order = 2.5,
+							type = "toggle",
+							name = "Flametongue",
+							width = 0.9,
+							get = function() return ShamanPower.opt.flyoutTotems == nil or ShamanPower.opt.flyoutTotems.fire_5 ~= false end,
+							set = function(_, val)
+								ShamanPower.opt.flyoutTotems = ShamanPower.opt.flyoutTotems or {}
+								ShamanPower.opt.flyoutTotems.fire_5 = val
+								ShamanPower:RecreateTotemFlyouts()
+							end,
+						},
+						fire_frostres = {
+							order = 2.6,
+							type = "toggle",
+							name = "Frost Resistance",
+							width = 0.9,
+							get = function() return ShamanPower.opt.flyoutTotems == nil or ShamanPower.opt.flyoutTotems.fire_6 ~= false end,
+							set = function(_, val)
+								ShamanPower.opt.flyoutTotems = ShamanPower.opt.flyoutTotems or {}
+								ShamanPower.opt.flyoutTotems.fire_6 = val
+								ShamanPower:RecreateTotemFlyouts()
+							end,
+						},
+						fire_elemental = {
+							order = 2.7,
+							type = "toggle",
+							name = "Fire Elemental",
+							width = 0.9,
+							get = function() return ShamanPower.opt.flyoutTotems == nil or ShamanPower.opt.flyoutTotems.fire_7 ~= false end,
+							set = function(_, val)
+								ShamanPower.opt.flyoutTotems = ShamanPower.opt.flyoutTotems or {}
+								ShamanPower.opt.flyoutTotems.fire_7 = val
+								ShamanPower:RecreateTotemFlyouts()
+							end,
+						},
+						-- Water Totems
+						water_header = {
+							order = 3,
+							type = "header",
+							name = "|cff00CED1Water Totems|r",
+						},
+						water_manaspring = {
+							order = 3.1,
+							type = "toggle",
+							name = "Mana Spring",
+							width = 0.9,
+							get = function() return ShamanPower.opt.flyoutTotems == nil or ShamanPower.opt.flyoutTotems.water_1 ~= false end,
+							set = function(_, val)
+								ShamanPower.opt.flyoutTotems = ShamanPower.opt.flyoutTotems or {}
+								ShamanPower.opt.flyoutTotems.water_1 = val
+								ShamanPower:RecreateTotemFlyouts()
+							end,
+						},
+						water_healingstream = {
+							order = 3.2,
+							type = "toggle",
+							name = "Healing Stream",
+							width = 0.9,
+							get = function() return ShamanPower.opt.flyoutTotems == nil or ShamanPower.opt.flyoutTotems.water_2 ~= false end,
+							set = function(_, val)
+								ShamanPower.opt.flyoutTotems = ShamanPower.opt.flyoutTotems or {}
+								ShamanPower.opt.flyoutTotems.water_2 = val
+								ShamanPower:RecreateTotemFlyouts()
+							end,
+						},
+						water_manatide = {
+							order = 3.3,
+							type = "toggle",
+							name = "Mana Tide",
+							width = 0.9,
+							get = function() return ShamanPower.opt.flyoutTotems == nil or ShamanPower.opt.flyoutTotems.water_3 ~= false end,
+							set = function(_, val)
+								ShamanPower.opt.flyoutTotems = ShamanPower.opt.flyoutTotems or {}
+								ShamanPower.opt.flyoutTotems.water_3 = val
+								ShamanPower:RecreateTotemFlyouts()
+							end,
+						},
+						water_poison = {
+							order = 3.4,
+							type = "toggle",
+							name = "Poison Cleansing",
+							width = 0.9,
+							get = function() return ShamanPower.opt.flyoutTotems == nil or ShamanPower.opt.flyoutTotems.water_4 ~= false end,
+							set = function(_, val)
+								ShamanPower.opt.flyoutTotems = ShamanPower.opt.flyoutTotems or {}
+								ShamanPower.opt.flyoutTotems.water_4 = val
+								ShamanPower:RecreateTotemFlyouts()
+							end,
+						},
+						water_disease = {
+							order = 3.5,
+							type = "toggle",
+							name = "Disease Cleansing",
+							width = 0.9,
+							get = function() return ShamanPower.opt.flyoutTotems == nil or ShamanPower.opt.flyoutTotems.water_5 ~= false end,
+							set = function(_, val)
+								ShamanPower.opt.flyoutTotems = ShamanPower.opt.flyoutTotems or {}
+								ShamanPower.opt.flyoutTotems.water_5 = val
+								ShamanPower:RecreateTotemFlyouts()
+							end,
+						},
+						water_fireres = {
+							order = 3.6,
+							type = "toggle",
+							name = "Fire Resistance",
+							width = 0.9,
+							get = function() return ShamanPower.opt.flyoutTotems == nil or ShamanPower.opt.flyoutTotems.water_6 ~= false end,
+							set = function(_, val)
+								ShamanPower.opt.flyoutTotems = ShamanPower.opt.flyoutTotems or {}
+								ShamanPower.opt.flyoutTotems.water_6 = val
+								ShamanPower:RecreateTotemFlyouts()
+							end,
+						},
+						-- Air Totems
+						air_header = {
+							order = 4,
+							type = "header",
+							name = "|cff87CEEBAir Totems|r",
+						},
+						air_windfury = {
+							order = 4.1,
+							type = "toggle",
+							name = "Windfury",
+							width = 0.9,
+							get = function() return ShamanPower.opt.flyoutTotems == nil or ShamanPower.opt.flyoutTotems.air_1 ~= false end,
+							set = function(_, val)
+								ShamanPower.opt.flyoutTotems = ShamanPower.opt.flyoutTotems or {}
+								ShamanPower.opt.flyoutTotems.air_1 = val
+								ShamanPower:RecreateTotemFlyouts()
+							end,
+						},
+						air_graceofair = {
+							order = 4.2,
+							type = "toggle",
+							name = "Grace of Air",
+							width = 0.9,
+							get = function() return ShamanPower.opt.flyoutTotems == nil or ShamanPower.opt.flyoutTotems.air_2 ~= false end,
+							set = function(_, val)
+								ShamanPower.opt.flyoutTotems = ShamanPower.opt.flyoutTotems or {}
+								ShamanPower.opt.flyoutTotems.air_2 = val
+								ShamanPower:RecreateTotemFlyouts()
+							end,
+						},
+						air_wrathofair = {
+							order = 4.3,
+							type = "toggle",
+							name = "Wrath of Air",
+							width = 0.9,
+							get = function() return ShamanPower.opt.flyoutTotems == nil or ShamanPower.opt.flyoutTotems.air_3 ~= false end,
+							set = function(_, val)
+								ShamanPower.opt.flyoutTotems = ShamanPower.opt.flyoutTotems or {}
+								ShamanPower.opt.flyoutTotems.air_3 = val
+								ShamanPower:RecreateTotemFlyouts()
+							end,
+						},
+						air_tranquil = {
+							order = 4.4,
+							type = "toggle",
+							name = "Tranquil Air",
+							width = 0.9,
+							get = function() return ShamanPower.opt.flyoutTotems == nil or ShamanPower.opt.flyoutTotems.air_4 ~= false end,
+							set = function(_, val)
+								ShamanPower.opt.flyoutTotems = ShamanPower.opt.flyoutTotems or {}
+								ShamanPower.opt.flyoutTotems.air_4 = val
+								ShamanPower:RecreateTotemFlyouts()
+							end,
+						},
+						air_grounding = {
+							order = 4.5,
+							type = "toggle",
+							name = "Grounding",
+							width = 0.9,
+							get = function() return ShamanPower.opt.flyoutTotems == nil or ShamanPower.opt.flyoutTotems.air_5 ~= false end,
+							set = function(_, val)
+								ShamanPower.opt.flyoutTotems = ShamanPower.opt.flyoutTotems or {}
+								ShamanPower.opt.flyoutTotems.air_5 = val
+								ShamanPower:RecreateTotemFlyouts()
+							end,
+						},
+						air_natureres = {
+							order = 4.6,
+							type = "toggle",
+							name = "Nature Resistance",
+							width = 0.9,
+							get = function() return ShamanPower.opt.flyoutTotems == nil or ShamanPower.opt.flyoutTotems.air_6 ~= false end,
+							set = function(_, val)
+								ShamanPower.opt.flyoutTotems = ShamanPower.opt.flyoutTotems or {}
+								ShamanPower.opt.flyoutTotems.air_6 = val
+								ShamanPower:RecreateTotemFlyouts()
+							end,
+						},
+						air_windwall = {
+							order = 4.7,
+							type = "toggle",
+							name = "Windwall",
+							width = 0.9,
+							get = function() return ShamanPower.opt.flyoutTotems == nil or ShamanPower.opt.flyoutTotems.air_7 ~= false end,
+							set = function(_, val)
+								ShamanPower.opt.flyoutTotems = ShamanPower.opt.flyoutTotems or {}
+								ShamanPower.opt.flyoutTotems.air_7 = val
+								ShamanPower:RecreateTotemFlyouts()
+							end,
+						},
+						air_sentry = {
+							order = 4.8,
+							type = "toggle",
+							name = "Sentry",
+							width = 0.9,
+							get = function() return ShamanPower.opt.flyoutTotems == nil or ShamanPower.opt.flyoutTotems.air_8 ~= false end,
+							set = function(_, val)
+								ShamanPower.opt.flyoutTotems = ShamanPower.opt.flyoutTotems or {}
+								ShamanPower.opt.flyoutTotems.air_8 = val
+								ShamanPower:RecreateTotemFlyouts()
 							end,
 						},
 					}

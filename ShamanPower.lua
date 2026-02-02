@@ -2439,7 +2439,8 @@ function ShamanPower:UpdateTwistTimer()
 		-- Show center-screen timer
 		if remaining > 0 then
 			if self.twistTimerFrame and self.twistTimerText then
-				self.twistTimerText:SetText(string.format("%.1f", remaining))
+				local format = self.opt.twistTimerNoDecimals and "%.0f" or "%.1f"
+				self.twistTimerText:SetText(string.format(format, remaining))
 				-- Color: white > 3s, yellow > 1s, red <= 1s
 				if remaining <= 1 then
 					self.twistTimerText:SetTextColor(1, 0.2, 0.2)
@@ -2458,10 +2459,23 @@ function ShamanPower:UpdateTwistTimer()
 			end
 		end
 	else
-		-- No Air totem active
-		self.twistStartTime = nil
-		if self.twistTimerFrame then
-			self.twistTimerFrame:Hide()
+		-- No Air totem active - but don't reset immediately in case we're mid-twist
+		-- Only reset if timer has expired or been running for a while with no totem
+		if self.twistStartTime then
+			local elapsed = GetTime() - self.twistStartTime
+			local remaining = self.TWIST_WINDOW - elapsed
+			if remaining <= 0 then
+				-- Timer expired, safe to reset
+				self.twistStartTime = nil
+				if self.twistTimerFrame then
+					self.twistTimerFrame:Hide()
+				end
+			end
+			-- Otherwise keep the timer running - Grace of Air might be incoming
+		else
+			if self.twistTimerFrame then
+				self.twistTimerFrame:Hide()
+			end
 		end
 	end
 end
@@ -2615,12 +2629,18 @@ function ShamanPower:SetupTotemProgressBars()
 			if ShamanPower.opt.totemBarFullOpacityWhenActive then
 				ShamanPower:UpdateTotemBarOpacity()
 			end
+
+			-- Update totem cooldowns on main buttons and flyout buttons
+			if ShamanPower.opt.showTotemCooldowns ~= false then
+				ShamanPower:UpdateTotemCooldowns()
+			end
 		end)
 	end
 	-- Only enable if any of these features are on
 	local needsProgressBars = self.opt.showDurationBars ~= false
 		or self.opt.dynamicTotemMode
 		or self.opt.totemBarFullOpacityWhenActive
+		or self.opt.showTotemCooldowns ~= false
 	if needsProgressBars then
 		self:EnableUpdateSubsystem("progressBars")
 	else
@@ -2639,6 +2659,7 @@ function ShamanPower:UpdateTotemProgressBarPositions()
 	local needsProgressBars = (not barDisabled) or (not textDisabled)
 		or self.opt.dynamicTotemMode
 		or self.opt.totemBarFullOpacityWhenActive
+		or self.opt.showTotemCooldowns ~= false
 	if needsProgressBars then
 		self:EnableUpdateSubsystem("progressBars")
 	else
@@ -2900,6 +2921,90 @@ function ShamanPower:UpdateTotemProgressBars()
 
 	-- Update active totem overlays
 	self:UpdateActiveTotemOverlays()
+end
+
+-- Format cooldown time for display
+local function FormatCooldownTime(seconds)
+	if seconds >= 60 then
+		return string.format("%dm", math.ceil(seconds / 60))
+	elseif seconds >= 10 then
+		return string.format("%d", math.floor(seconds))
+	else
+		return string.format("%.1f", seconds)
+	end
+end
+
+-- Update cooldown displays on totem buttons and flyout buttons
+function ShamanPower:UpdateTotemCooldowns()
+	-- Update main totem buttons
+	for element = 1, 4 do
+		local btn = self.totemButtons[element]
+		if btn and btn.cooldown then
+			-- Get the assigned totem's spell ID
+			local assignments = ShamanPower_Assignments[self.player]
+			local totemIndex = assignments and assignments[element] or 0
+			local spellID = nil
+
+			if totemIndex and totemIndex > 0 then
+				spellID = self:GetTotemSpell(element, totemIndex)
+			end
+
+			if spellID then
+				local start, duration, enabled = GetSpellCooldown(spellID)
+				-- Only show cooldown if it's longer than GCD (1.5 sec)
+				if start and duration and duration > 1.5 and enabled == 1 then
+					btn.cooldown:SetCooldown(start, duration)
+					-- Calculate remaining time for text
+					local remaining = (start + duration) - GetTime()
+					if remaining > 0 and btn.cooldownText then
+						btn.cooldownText:SetText(FormatCooldownTime(remaining))
+						btn.cooldownText:Show()
+					elseif btn.cooldownText then
+						btn.cooldownText:Hide()
+					end
+				else
+					btn.cooldown:Clear()
+					if btn.cooldownText then
+						btn.cooldownText:Hide()
+					end
+				end
+			else
+				btn.cooldown:Clear()
+				if btn.cooldownText then
+					btn.cooldownText:Hide()
+				end
+			end
+		end
+	end
+
+	-- Update flyout buttons
+	for element = 1, 4 do
+		local flyout = self.totemFlyouts[element]
+		if flyout and flyout.buttons then
+			for _, btn in ipairs(flyout.buttons) do
+				if btn.cooldown and btn.spellID then
+					local start, duration, enabled = GetSpellCooldown(btn.spellID)
+					-- Only show cooldown if it's longer than GCD (1.5 sec)
+					if start and duration and duration > 1.5 and enabled == 1 then
+						btn.cooldown:SetCooldown(start, duration)
+						-- Calculate remaining time for text
+						local remaining = (start + duration) - GetTime()
+						if remaining > 0 and btn.cooldownText then
+							btn.cooldownText:SetText(FormatCooldownTime(remaining))
+							btn.cooldownText:Show()
+						elseif btn.cooldownText then
+							btn.cooldownText:Hide()
+						end
+					else
+						btn.cooldown:Clear()
+						if btn.cooldownText then
+							btn.cooldownText:Hide()
+						end
+					end
+				end
+			end
+		end
+	end
 end
 
 -- Update progress bars on popped-out single totems
@@ -3365,11 +3470,21 @@ function ShamanPower:UpdateActiveTotemOverlays()
 					totemButton.assignedIndicator:Hide()
 				end
 
-				-- Restore main button icon to assigned totem
+				-- Restore main button icon
 				if useActiveAsMain and totemButton and iconTexture then
-					local assignedIcon = self:GetTotemIcon(element, assignedIndex)
-					if assignedIcon then
-						iconTexture:SetTexture(assignedIcon)
+					-- Special case: Air totem with twisting - show the currently active totem icon
+					if element == 4 and self.opt.enableTotemTwisting and haveTotem and totemName then
+						-- Get icon for the currently active totem (Windfury or Grace of Air)
+						local _, _, activeTotemIcon = GetSpellInfo(totemName)
+						if activeTotemIcon then
+							iconTexture:SetTexture(activeTotemIcon)
+						end
+					else
+						-- Normal case: show assigned totem icon
+						local assignedIcon = self:GetTotemIcon(element, assignedIndex)
+						if assignedIcon then
+							iconTexture:SetTexture(assignedIcon)
+						end
 					end
 				end
 
@@ -4699,6 +4814,23 @@ function ShamanPower:CreateTotemButtons()
 		btn.assignedIndicator = assignedIndicator
 		btn.assignedIndicatorIcon = indicatorIcon
 
+		-- Create cooldown frame for spell cooldown display on main totem button
+		local cdFrame = CreateFrame("Cooldown", btn:GetName() .. "Cooldown", btn, "CooldownFrameTemplate")
+		cdFrame:SetAllPoints(btn.icon)
+		cdFrame:SetDrawSwipe(true)
+		cdFrame:SetDrawEdge(true)
+		cdFrame:SetSwipeColor(0, 0, 0, 0.8)
+		cdFrame:SetHideCountdownNumbers(true)  -- We'll show our own text
+		btn.cooldown = cdFrame
+
+		-- Create cooldown text overlay for main totem button
+		local cdText = btn:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+		cdText:SetPoint("CENTER", btn, "CENTER", 0, 0)
+		cdText:SetTextColor(1, 1, 1)
+		cdText:SetShadowOffset(1, -1)
+		cdText:Hide()
+		btn.cooldownText = cdText
+
 		-- SECURE HANDLER: Show flyout on enter (WORKS IN COMBAT)
 		btn:SetAttribute("OpenMenu", "mouseover")
 		btn:SetAttribute("_onenter", [[
@@ -4983,7 +5115,8 @@ function ShamanPower:CreateTotemFlyout(element)
 
 	-- Flyout is just a table to track buttons (buttons are children of parentButton)
 	local flyout = {
-		buttons = {},
+		buttons = {},      -- Active/enabled buttons only
+		allButtons = {},   -- All known totem buttons (for rebuilding when settings change)
 		buttonSize = 28,
 		padding = 4,
 		spacing = 0,  -- No gap between buttons to prevent menu closing when moving mouse
@@ -4991,11 +5124,19 @@ function ShamanPower:CreateTotemFlyout(element)
 		totemButton = parentButton
 	}
 
+	-- Element names for flyout settings lookup
+	local elementKeys = { [1] = "earth", [2] = "fire", [3] = "water", [4] = "air" }
+	local elementKey = elementKeys[element]
+
 	for totemIndex, spellID in pairs(totems) do
 		-- Check if player knows this totem using improved spellbook search
 		local spellName = GetSpellInfo(spellID)
 		local totemName = totemNames and totemNames[totemIndex]
 		local isKnown = PlayerKnowsTotem(spellID, totemName)
+
+		-- Check if totem is enabled in flyout settings (default to true if not set)
+		local flyoutKey = elementKey .. "_" .. totemIndex
+		local isEnabledInFlyout = self.opt.flyoutTotems == nil or self.opt.flyoutTotems[flyoutKey] ~= false
 
 		if isKnown then
 			-- Create button as CHILD of totem button using SPFlyoutButtonTemplate
@@ -5147,6 +5288,23 @@ function ShamanPower:CreateTotemFlyout(element)
 			btn.icon:SetTexture(icons[totemIndex] or "Interface\\Icons\\INV_Misc_QuestionMark")
 			btn.icon:Show()
 
+			-- Create cooldown frame for spell cooldown display
+			local cdFrame = CreateFrame("Cooldown", btn:GetName() .. "Cooldown", btn, "CooldownFrameTemplate")
+			cdFrame:SetAllPoints(btn.icon)
+			cdFrame:SetDrawSwipe(true)
+			cdFrame:SetDrawEdge(true)
+			cdFrame:SetSwipeColor(0, 0, 0, 0.8)
+			cdFrame:SetHideCountdownNumbers(true)  -- We'll show our own text
+			btn.cooldown = cdFrame
+
+			-- Create cooldown text overlay
+			local cdText = btn:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+			cdText:SetPoint("CENTER", btn, "CENTER", 0, 0)
+			cdText:SetTextColor(1, 1, 1)
+			cdText:SetShadowOffset(1, -1)
+			cdText:Hide()
+			btn.cooldownText = cdText
+
 			-- Tooltip (Lua hook, works alongside secure handlers)
 			btn:HookScript("OnEnter", function(self)
 				GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
@@ -5237,11 +5395,24 @@ function ShamanPower:CreateTotemFlyout(element)
 
 			btn.totemIndex = totemIndex
 			btn.spellID = spellID
-			table.insert(flyout.buttons, btn)
+
+			-- Always add to allButtons (for rebuilding when settings change)
+			table.insert(flyout.allButtons, btn)
+
+			-- Only add to active buttons if enabled in flyout settings
+			if isEnabledInFlyout then
+				btn.isDisabledInFlyout = false
+				table.insert(flyout.buttons, btn)
+			else
+				btn.isDisabledInFlyout = true
+				btn:Hide()
+				btn:SetAttribute("isCurrentAssignment", true)  -- Treat as hidden
+			end
 		end
 	end
 
 	-- Sort buttons by totemIndex for consistent ordering
+	table.sort(flyout.allButtons, function(a, b) return a.totemIndex < b.totemIndex end)
 	table.sort(flyout.buttons, function(a, b) return a.totemIndex < b.totemIndex end)
 
 	-- Initial layout
@@ -5467,6 +5638,17 @@ function ShamanPower:UpdateFlyoutVisibility(element)
 	local assignments = ShamanPower_Assignments[self.player]
 	local currentTotemIndex = assignments and assignments[element] or 0
 
+	-- In TotemTimers style mode (activeTotemAsMain), the main button ICON shows the active totem.
+	-- So we should hide the ACTIVE totem from the flyout, not the assigned one.
+	-- This prevents the visual confusion of the same totem appearing on the main button and in the flyout.
+	local hideIndex = currentTotemIndex
+	if self.opt.activeTotemAsMain then
+		local activeIndex = self:GetActiveTotemIndex(element)
+		if activeIndex then
+			hideIndex = activeIndex
+		end
+	end
+
 	-- For horizontal bar, flyout is vertical. For vertical bar (both "Vertical" and "VerticalLeft"), flyout is horizontal.
 	local isHorizontalBar = (self.opt.layout == "Horizontal")
 	local isVerticalLeft = (self.opt.layout == "VerticalLeft")
@@ -5486,12 +5668,12 @@ function ShamanPower:UpdateFlyoutVisibility(element)
 	local visibleIndex = 0
 	local visibleButtons = {}
 
-	-- First pass: determine which buttons should be visible (hide current assignment and popped-out totems)
+	-- First pass: determine which buttons should be visible (hide totem shown on main button and popped-out totems)
 	for _, btn in ipairs(flyout.buttons) do
 		local totemIdx = btn.totemIndex
 		local isPoppedOut = self:IsSingleTotemPoppedOut(element, totemIdx)
 
-		if totemIdx == currentTotemIndex or isPoppedOut then
+		if totemIdx == hideIndex or isPoppedOut then
 			-- Mark this button to be hidden (via attribute so secure handler knows)
 			btn:SetAttribute("isCurrentAssignment", true)
 			if isPoppedOut then
@@ -5720,21 +5902,41 @@ function ShamanPower:RecreateTotemFlyouts()
 		return
 	end
 
-	-- Destroy existing flyout buttons (buttons are children of totemButton)
+	-- Instead of destroying and recreating buttons (which breaks secure handlers),
+	-- just update which buttons are enabled/disabled and rebuild the buttons table
+	local elementKeys = { [1] = "earth", [2] = "fire", [3] = "water", [4] = "air" }
+
 	for element = 1, 4 do
 		local flyout = self.totemFlyouts[element]
-		if flyout and flyout.buttons then
-			for _, btn in ipairs(flyout.buttons) do
-				btn:Hide()
-				btn:SetParent(nil)
-			end
-		end
-		self.totemFlyouts[element] = nil
-		-- Note: We don't reset flyoutHooksInstalled since the secure handlers on totemButton persist
-	end
+		if flyout and flyout.allButtons then
+			-- Rebuild the active buttons list based on current settings
+			local elementKey = elementKeys[element]
+			flyout.buttons = {}
 
-	-- Recreate flyouts with new settings
-	self:SetupTotemFlyouts()
+			for _, btn in ipairs(flyout.allButtons) do
+				local totemIdx = btn.totemIndex
+				local flyoutKey = elementKey .. "_" .. totemIdx
+				local isEnabled = self.opt.flyoutTotems == nil or self.opt.flyoutTotems[flyoutKey] ~= false
+
+				if isEnabled then
+					btn.isDisabledInFlyout = false
+					btn:SetAttribute("isCurrentAssignment", false)
+					table.insert(flyout.buttons, btn)
+				else
+					btn:Hide()
+					btn.isDisabledInFlyout = true
+					btn:SetAttribute("isCurrentAssignment", true)  -- Treat as hidden
+				end
+			end
+
+			-- Sort buttons by totemIndex for consistent ordering
+			table.sort(flyout.buttons, function(a, b) return a.totemIndex < b.totemIndex end)
+
+			-- Re-layout the flyout
+			self:LayoutFlyoutButtons(flyout)
+			self:UpdateFlyoutVisibility(element)
+		end
+	end
 end
 
 -- ============================================================================
