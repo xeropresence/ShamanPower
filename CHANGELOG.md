@@ -2,11 +2,47 @@
 
 ## [v1.5.4](https://github.com/taubut/ShamanPower/releases/tag/v1.5.4) (2026-02-01)
 
+### New Features
+- **ShamanPower [Reactive Totems] Module**: Shows large totem icons when party members have cleansable debuffs
+  - Displays Tremor Totem icon when party members are feared, charmed, or horrified
+  - Displays Poison Cleansing Totem icon when party members are poisoned
+  - Displays Disease Cleansing Totem icon when party members are diseased
+  - Click-to-cast: left-click the icon to instantly drop the totem
+  - Each totem type has its own independently movable frame
+  - Event-driven with throttling - only scans when party auras change, no polling
+  - Party-only scanning (totems are party-wide, not raid-wide)
+  - Full customization in Look & Feel: icon size, scale, opacity, glow effects, sounds, hide text options
+  - Slash commands: `/spreactive show` (position frames), `/spreactive hide`, `/spreactive test`, `/spreactive reset`
+
+- **ShamanPower [Expiring Alerts] Module**: Scrolling combat text style alerts when buffs expire
+  - **Shield Alerts**: Lightning Shield, Water Shield, and Earth Shield (on your assigned target)
+  - **Totem Alerts**: Detects when totems are destroyed by enemies vs expired naturally
+    - Per-element toggles (Earth, Fire, Water, Air)
+    - Rank stripped from totem names for cleaner display
+  - **Weapon Imbue Alerts**: Main hand and off hand tracked separately
+  - **Display Modes**: Text only, Icon only, or Icon + Text
+  - **Animation Styles**: Scroll Up, Scroll Down, Static Fade, Bounce
+  - **Customization**: Text size, icon size, duration, opacity (50-100%), font outline
+  - **Sound Options**: Per-alert-type sound toggles
+  - Center-aligned alerts with draggable positioning frame
+  - Slash commands: `/spalerts show` (position), `/spalerts hide`, `/spalerts test`, `/spalerts reset`, `/spalerts toggle`
+
+- **ShamanPower [Tremor Reminder] Module**: Proactive Tremor Totem reminder when targeting fear-casting mobs
+  - Shows a Tremor Totem icon when you target known fear-casters (before anyone gets feared)
+  - Built-in database of 50+ TBC dungeon and raid fear-casting mobs
+  - Click-to-cast: left-click the icon to instantly drop Tremor Totem
+  - Hides automatically when Tremor Totem is already active
+  - Customization: icon size, scale, opacity, glow effects, glow color, sound
+  - Manage custom mob list via slash commands
+  - Slash commands: `/sptremor show`, `/sptremor test`, `/sptremor reset`, `/sptremor add <mob>`, `/sptremor remove <mob>`, `/sptremor list`
+  - Based on Sweb's Tremor Totem Reminder WeakAura
+
 ### Bug Fixes
 - **Weapon enchant totem self-range tracking**: Fixed Windfury and Flametongue Totems not greying out when the shaman walks out of range of their own totem
   - Now detects range via weapon enchant (same method as SPRange module)
   - Affects both Windfury Totem (Air) and Flametongue Totem (Fire)
   - Works correctly when "Party Buff Tracker" is disabled - shaman can still see their own totem range
+- **TOC Interface version**: Updated all module TOC files to correct Interface version (20505) so they no longer show as "Out of date" in the addon list
 
 ## [v1.5.3](https://github.com/taubut/ShamanPower/releases/tag/v1.5.3) (2026-01-30)
 

@@ -1670,7 +1670,7 @@ ShamanPower.options = {
 				},
 				raid_cd_section = {
 					order = 18,
-					name = "Raid Cooldowns",
+					name = "|cff0070ddRaid Cooldowns|r",
 					type = "group",
 					args = {
 						raid_cd_desc = {
@@ -1768,7 +1768,7 @@ ShamanPower.options = {
 				},
 				sprange_section = {
 					order = 15,
-					name = "Totem Range Tracker",
+					name = "|cff0070ddTotem Range Tracker|r",
 					type = "group",
 					args = {
 						sprange_desc = {
@@ -1862,7 +1862,7 @@ ShamanPower.options = {
 				},
 				partybuff_section = {
 					order = 14,
-					name = "Party Buff Tracker",
+					name = "|cff0070ddParty Buff Tracker|r",
 					type = "group",
 					args = {
 						partybuff_desc = {
@@ -2138,7 +2138,7 @@ ShamanPower.options = {
 				},
 				estrack_section = {
 					order = 16,
-					name = "Earth Shield Tracker",
+					name = "|cff0070ddEarth Shield Tracker|r",
 					type = "group",
 					args = {
 						estrack_desc = {
@@ -2267,7 +2267,7 @@ ShamanPower.options = {
 				},
 				shieldcharges_section = {
 					order = 17,
-					name = "Shield Charge Display",
+					name = "|cff0070ddShield Charge Display|r",
 					type = "group",
 					args = {
 						shieldcharges_desc = {
@@ -2390,6 +2390,1404 @@ ShamanPower.options = {
 								if ShamanPower.opt.shieldChargeDisplay then
 									ShamanPower.opt.shieldChargeDisplay.hideNoShields = val
 									ShamanPower:UpdateShieldChargeDisplays()
+								end
+							end
+						},
+					}
+				},
+				reactivetotems_section = {
+					order = 18,
+					name = "|cff0070ddReactive Totems|r",
+					type = "group",
+					args = {
+						reactive_desc = {
+							order = 0,
+							type = "description",
+							name = "Shows large totem icons when you have fear, disease, or poison debuffs. Click to cast the appropriate cleansing totem.\n\n|cffff8800Note:|r Requires the |cff00ff00ShamanPower [Reactive Totems]|r module to be enabled in your AddOns list.\n",
+						},
+						reactive_enabled = {
+							order = 1,
+							name = "Enable Reactive Totems",
+							desc = "Enable the reactive totem display when you have cleansable debuffs",
+							type = "toggle",
+							width = 1.0,
+							get = function(info)
+								if ShamanPower_ReactiveTotems then
+									return ShamanPower_ReactiveTotems.enabled ~= false
+								end
+								return true
+							end,
+							set = function(info, val)
+								if ShamanPower_ReactiveTotems then
+									ShamanPower_ReactiveTotems.enabled = val
+									if ShamanPower.UpdateReactiveTotems then
+										ShamanPower:UpdateReactiveTotems()
+									end
+								end
+							end
+						},
+						reactive_locked = {
+							order = 1.5,
+							name = "Lock Positions",
+							desc = "Lock the frame positions so they can't be dragged",
+							type = "toggle",
+							width = 1.0,
+							get = function(info)
+								if ShamanPower_ReactiveTotems then
+									return ShamanPower_ReactiveTotems.locked or false
+								end
+								return false
+							end,
+							set = function(info, val)
+								if ShamanPower_ReactiveTotems then
+									ShamanPower_ReactiveTotems.locked = val
+								end
+							end
+						},
+						reactive_header_tracking = {
+							order = 2,
+							type = "header",
+							name = "Debuff Tracking",
+						},
+						reactive_track_fear = {
+							order = 3,
+							name = "Track Fear/Charm",
+							desc = "Show Tremor Totem icon when feared, charmed, or horrified",
+							type = "toggle",
+							width = 1.0,
+							get = function(info)
+								if ShamanPower_ReactiveTotems and ShamanPower_ReactiveTotems then
+									return ShamanPower_ReactiveTotems.trackFear ~= false
+								end
+								return true
+							end,
+							set = function(info, val)
+								if ShamanPower_ReactiveTotems and ShamanPower_ReactiveTotems then
+									ShamanPower_ReactiveTotems.trackFear = val
+									if ShamanPower.UpdateReactiveTotems then
+										ShamanPower:UpdateReactiveTotems()
+									end
+								end
+							end
+						},
+						reactive_track_poison = {
+							order = 4,
+							name = "Track Poison",
+							desc = "Show Poison Cleansing Totem icon when poisoned",
+							type = "toggle",
+							width = 1.0,
+							get = function(info)
+								if ShamanPower_ReactiveTotems and ShamanPower_ReactiveTotems then
+									return ShamanPower_ReactiveTotems.trackPoison ~= false
+								end
+								return true
+							end,
+							set = function(info, val)
+								if ShamanPower_ReactiveTotems and ShamanPower_ReactiveTotems then
+									ShamanPower_ReactiveTotems.trackPoison = val
+									if ShamanPower.UpdateReactiveTotems then
+										ShamanPower:UpdateReactiveTotems()
+									end
+								end
+							end
+						},
+						reactive_track_disease = {
+							order = 5,
+							name = "Track Disease",
+							desc = "Show Disease Cleansing Totem icon when diseased",
+							type = "toggle",
+							width = 1.0,
+							get = function(info)
+								if ShamanPower_ReactiveTotems and ShamanPower_ReactiveTotems then
+									return ShamanPower_ReactiveTotems.trackDisease ~= false
+								end
+								return true
+							end,
+							set = function(info, val)
+								if ShamanPower_ReactiveTotems and ShamanPower_ReactiveTotems then
+									ShamanPower_ReactiveTotems.trackDisease = val
+									if ShamanPower.UpdateReactiveTotems then
+										ShamanPower:UpdateReactiveTotems()
+									end
+								end
+							end
+						},
+						reactive_header_appearance = {
+							order = 6,
+							type = "header",
+							name = "Appearance",
+						},
+						reactive_icon_size = {
+							order = 6.5,
+							name = "Icon Size",
+							desc = "Base size of the reactive totem icons in pixels",
+							type = "range",
+							width = 1.5,
+							min = 32,
+							max = 128,
+							step = 4,
+							get = function(info)
+								if ShamanPower_ReactiveTotems then
+									return ShamanPower_ReactiveTotems.iconSize or 64
+								end
+								return 64
+							end,
+							set = function(info, val)
+								if ShamanPower_ReactiveTotems then
+									ShamanPower_ReactiveTotems.iconSize = val
+									if ShamanPower.UpdateReactiveTotemAppearance then
+										ShamanPower:UpdateReactiveTotemAppearance()
+									end
+								end
+							end
+						},
+						reactive_scale = {
+							order = 7,
+							name = "Scale",
+							desc = "Additional scale multiplier for the icons",
+							type = "range",
+							width = 1.5,
+							min = 0.5,
+							max = 2.0,
+							step = 0.1,
+							get = function(info)
+								if ShamanPower_ReactiveTotems then
+									return ShamanPower_ReactiveTotems.scale or 1.0
+								end
+								return 1.0
+							end,
+							set = function(info, val)
+								if ShamanPower_ReactiveTotems then
+									ShamanPower_ReactiveTotems.scale = val
+									if ShamanPower.UpdateReactiveTotemAppearance then
+										ShamanPower:UpdateReactiveTotemAppearance()
+									end
+								end
+							end
+						},
+						reactive_opacity = {
+							order = 8,
+							name = "Opacity",
+							desc = "Adjust the opacity of the reactive totem icons",
+							type = "range",
+							width = 1.5,
+							min = 0.2,
+							max = 1.0,
+							step = 0.1,
+							get = function(info)
+								if ShamanPower_ReactiveTotems and ShamanPower_ReactiveTotems then
+									return ShamanPower_ReactiveTotems.opacity or 1.0
+								end
+								return 1.0
+							end,
+							set = function(info, val)
+								if ShamanPower_ReactiveTotems and ShamanPower_ReactiveTotems then
+									ShamanPower_ReactiveTotems.opacity = val
+									if ShamanPower.UpdateReactiveTotemAppearance then
+										ShamanPower:UpdateReactiveTotemAppearance()
+									end
+								end
+							end
+						},
+						reactive_hide_border = {
+							order = 9,
+							name = "Hide Border",
+							desc = "Hide the border around the reactive totem icons",
+							type = "toggle",
+							width = 1.0,
+							get = function(info)
+								if ShamanPower_ReactiveTotems and ShamanPower_ReactiveTotems then
+									return ShamanPower_ReactiveTotems.hideBorder or false
+								end
+								return false
+							end,
+							set = function(info, val)
+								if ShamanPower_ReactiveTotems and ShamanPower_ReactiveTotems then
+									ShamanPower_ReactiveTotems.hideBorder = val
+									if ShamanPower.UpdateReactiveTotemAppearance then
+										ShamanPower:UpdateReactiveTotemAppearance()
+									end
+								end
+							end
+						},
+						reactive_hide_background = {
+							order = 10,
+							name = "Hide Background",
+							desc = "Hide the background behind the reactive totem icons",
+							type = "toggle",
+							width = 1.0,
+							get = function(info)
+								if ShamanPower_ReactiveTotems and ShamanPower_ReactiveTotems then
+									return ShamanPower_ReactiveTotems.hideBackground or false
+								end
+								return false
+							end,
+							set = function(info, val)
+								if ShamanPower_ReactiveTotems and ShamanPower_ReactiveTotems then
+									ShamanPower_ReactiveTotems.hideBackground = val
+									if ShamanPower.UpdateReactiveTotemAppearance then
+										ShamanPower:UpdateReactiveTotemAppearance()
+									end
+								end
+							end
+						},
+						reactive_font_size = {
+							order = 11,
+							name = "Font Size",
+							desc = "Size of the totem name text",
+							type = "range",
+							width = 1.5,
+							min = 8,
+							max = 24,
+							step = 1,
+							get = function(info)
+								if ShamanPower_ReactiveTotems and ShamanPower_ReactiveTotems then
+									return ShamanPower_ReactiveTotems.fontSize or 12
+								end
+								return 12
+							end,
+							set = function(info, val)
+								if ShamanPower_ReactiveTotems and ShamanPower_ReactiveTotems then
+									ShamanPower_ReactiveTotems.fontSize = val
+									if ShamanPower.UpdateReactiveTotemAppearance then
+										ShamanPower:UpdateReactiveTotemAppearance()
+									end
+								end
+							end
+						},
+						reactive_hide_debuff_text = {
+							order = 11.1,
+							name = "Hide Debuff Text",
+							desc = "Hide the debuff name/type text (e.g. 'PlayerName: Fear')",
+							type = "toggle",
+							width = 1.0,
+							get = function(info)
+								if ShamanPower_ReactiveTotems then
+									return not ShamanPower_ReactiveTotems.showDebuffName
+								end
+								return false
+							end,
+							set = function(info, val)
+								if ShamanPower_ReactiveTotems then
+									ShamanPower_ReactiveTotems.showDebuffName = not val
+									if ShamanPower.UpdateReactiveTotemAppearance then
+										ShamanPower:UpdateReactiveTotemAppearance()
+									end
+								end
+							end
+						},
+						reactive_hide_totem_text = {
+							order = 11.2,
+							name = "Hide Totem Name",
+							desc = "Hide the totem name text (e.g. 'Tremor Totem')",
+							type = "toggle",
+							width = 1.0,
+							get = function(info)
+								if ShamanPower_ReactiveTotems then
+									return not ShamanPower_ReactiveTotems.showTotemName
+								end
+								return false
+							end,
+							set = function(info, val)
+								if ShamanPower_ReactiveTotems then
+									ShamanPower_ReactiveTotems.showTotemName = not val
+									if ShamanPower.UpdateReactiveTotemAppearance then
+										ShamanPower:UpdateReactiveTotemAppearance()
+									end
+								end
+							end
+						},
+						reactive_header_effects = {
+							order = 12,
+							type = "header",
+							name = "Effects",
+						},
+						reactive_glow = {
+							order = 13,
+							name = "Show Glow Effect",
+							desc = "Show a pulsing glow around the reactive totem icons",
+							type = "toggle",
+							width = 1.0,
+							get = function(info)
+								if ShamanPower_ReactiveTotems then
+									return ShamanPower_ReactiveTotems.showGlow ~= false
+								end
+								return true
+							end,
+							set = function(info, val)
+								if ShamanPower_ReactiveTotems then
+									ShamanPower_ReactiveTotems.showGlow = val
+									if ShamanPower.UpdateReactiveTotemAppearance then
+										ShamanPower:UpdateReactiveTotemAppearance()
+									end
+								end
+							end
+						},
+						reactive_glow_intensity = {
+							order = 13.5,
+							name = "Glow Intensity",
+							desc = "Intensity of the pulsing glow effect",
+							type = "range",
+							width = 1.5,
+							min = 0.2,
+							max = 1.0,
+							step = 0.1,
+							get = function(info)
+								if ShamanPower_ReactiveTotems then
+									return ShamanPower_ReactiveTotems.glowIntensity or 0.8
+								end
+								return 0.8
+							end,
+							set = function(info, val)
+								if ShamanPower_ReactiveTotems then
+									ShamanPower_ReactiveTotems.glowIntensity = val
+								end
+							end
+						},
+						reactive_sound = {
+							order = 14,
+							name = "Play Alert Sound",
+							desc = "Play a sound when a reactive totem icon appears",
+							type = "toggle",
+							width = 1.0,
+							get = function(info)
+								if ShamanPower_ReactiveTotems then
+									return ShamanPower_ReactiveTotems.playSound or false
+								end
+								return false
+							end,
+							set = function(info, val)
+								if ShamanPower_ReactiveTotems then
+									ShamanPower_ReactiveTotems.playSound = val
+								end
+							end
+						},
+						reactive_font_outline = {
+							order = 14.6,
+							name = "Font Outline",
+							desc = "Add outline to the text for better visibility",
+							type = "toggle",
+							width = 1.0,
+							get = function(info)
+								if ShamanPower_ReactiveTotems then
+									return ShamanPower_ReactiveTotems.fontOutline ~= false
+								end
+								return true
+							end,
+							set = function(info, val)
+								if ShamanPower_ReactiveTotems then
+									ShamanPower_ReactiveTotems.fontOutline = val
+									if ShamanPower.UpdateReactiveTotemAppearance then
+										ShamanPower:UpdateReactiveTotemAppearance()
+									end
+								end
+							end
+						},
+						reactive_header_buttons = {
+							order = 15,
+							type = "header",
+							name = "Testing",
+						},
+						reactive_test = {
+							order = 16,
+							type = "execute",
+							name = "Test All Frames",
+							desc = "Show all reactive totem frames for 3 seconds with glow effect",
+							func = function()
+								if ShamanPower.TestReactiveTotems then
+									ShamanPower:TestReactiveTotems()
+								end
+							end
+						},
+						reactive_show = {
+							order = 17,
+							type = "execute",
+							name = "Show All (Position)",
+							desc = "Show all frames for positioning - click-to-cast is disabled so you can drag freely",
+							func = function()
+								if ShamanPower.ShowAllReactiveFrames then
+									ShamanPower:ShowAllReactiveFrames()
+								end
+							end
+						},
+						reactive_hide = {
+							order = 18,
+							type = "execute",
+							name = "Hide All",
+							desc = "Hide all frames and restore click-to-cast",
+							func = function()
+								if ShamanPower.HideAllReactiveFrames then
+									ShamanPower:HideAllReactiveFrames()
+								end
+							end
+						},
+						reactive_reset = {
+							order = 19,
+							type = "execute",
+							name = "Reset Positions",
+							desc = "Reset all reactive totem frames to their default positions",
+							func = function()
+								if ShamanPower.ResetReactiveTotemPositions then
+									ShamanPower:ResetReactiveTotemPositions()
+								end
+							end
+						},
+					}
+				},
+				expiringalerts_section = {
+					order = 19,
+					name = "|cff0070ddExpiring Alerts|r",
+					type = "group",
+					args = {
+						alerts_desc = {
+							order = 0,
+							type = "description",
+							name = "Scrolling combat text style alerts when shields expire, totems are destroyed/expire, and weapon imbues fade.\n\n|cffff8800Note:|r Requires the |cff00ff00ShamanPower [Expiring Alerts]|r module to be enabled in your AddOns list.\n",
+						},
+						alerts_enabled = {
+							order = 1,
+							name = "Enable Expiring Alerts",
+							desc = "Enable scrolling text alerts for expiring buffs",
+							type = "toggle",
+							width = 1.0,
+							get = function(info)
+								if ShamanPowerExpiringAlertsDB then
+									return ShamanPowerExpiringAlertsDB.enabled ~= false
+								end
+								return true
+							end,
+							set = function(info, val)
+								if ShamanPowerExpiringAlertsDB then
+									ShamanPowerExpiringAlertsDB.enabled = val
+								end
+							end
+						},
+						alerts_header_display = {
+							order = 2,
+							type = "header",
+							name = "Display Settings",
+						},
+						alerts_display_mode = {
+							order = 3,
+							name = "Display Mode",
+							desc = "How to display alerts",
+							type = "select",
+							width = 1.0,
+							values = {
+								["text"] = "Text Only",
+								["icon"] = "Icon Only",
+								["both"] = "Icon + Text",
+							},
+							get = function(info)
+								if ShamanPowerExpiringAlertsDB then
+									return ShamanPowerExpiringAlertsDB.displayMode or "both"
+								end
+								return "both"
+							end,
+							set = function(info, val)
+								if ShamanPowerExpiringAlertsDB then
+									ShamanPowerExpiringAlertsDB.displayMode = val
+								end
+							end
+						},
+						alerts_animation = {
+							order = 4,
+							name = "Animation Style",
+							desc = "How alerts animate on screen",
+							type = "select",
+							width = 1.0,
+							values = {
+								["scrollUp"] = "Scroll Up",
+								["scrollDown"] = "Scroll Down",
+								["staticFade"] = "Static Fade",
+								["bounce"] = "Bounce",
+							},
+							get = function(info)
+								if ShamanPowerExpiringAlertsDB then
+									return ShamanPowerExpiringAlertsDB.animationStyle or "scrollUp"
+								end
+								return "scrollUp"
+							end,
+							set = function(info, val)
+								if ShamanPowerExpiringAlertsDB then
+									ShamanPowerExpiringAlertsDB.animationStyle = val
+								end
+							end
+						},
+						alerts_text_size = {
+							order = 5,
+							name = "Text Size",
+							desc = "Size of alert text",
+							type = "range",
+							width = 1.5,
+							min = 12,
+							max = 36,
+							step = 1,
+							get = function(info)
+								if ShamanPowerExpiringAlertsDB then
+									return ShamanPowerExpiringAlertsDB.textSize or 24
+								end
+								return 24
+							end,
+							set = function(info, val)
+								if ShamanPowerExpiringAlertsDB then
+									ShamanPowerExpiringAlertsDB.textSize = val
+									if ShamanPower.UpdateExpiringAlertsAppearance then
+										ShamanPower:UpdateExpiringAlertsAppearance()
+									end
+								end
+							end
+						},
+						alerts_icon_size = {
+							order = 6,
+							name = "Icon Size",
+							desc = "Size of alert icons",
+							type = "range",
+							width = 1.5,
+							min = 24,
+							max = 64,
+							step = 2,
+							get = function(info)
+								if ShamanPowerExpiringAlertsDB then
+									return ShamanPowerExpiringAlertsDB.iconSize or 32
+								end
+								return 32
+							end,
+							set = function(info, val)
+								if ShamanPowerExpiringAlertsDB then
+									ShamanPowerExpiringAlertsDB.iconSize = val
+									if ShamanPower.UpdateExpiringAlertsAppearance then
+										ShamanPower:UpdateExpiringAlertsAppearance()
+									end
+								end
+							end
+						},
+						alerts_duration = {
+							order = 7,
+							name = "Duration",
+							desc = "How long alerts stay on screen (seconds)",
+							type = "range",
+							width = 1.5,
+							min = 1,
+							max = 5,
+							step = 0.5,
+							get = function(info)
+								if ShamanPowerExpiringAlertsDB then
+									return ShamanPowerExpiringAlertsDB.duration or 2.5
+								end
+								return 2.5
+							end,
+							set = function(info, val)
+								if ShamanPowerExpiringAlertsDB then
+									ShamanPowerExpiringAlertsDB.duration = val
+								end
+							end
+						},
+						alerts_opacity = {
+							order = 8,
+							name = "Opacity",
+							desc = "Opacity of alerts (0-100%)",
+							type = "range",
+							width = 1.5,
+							min = 50,
+							max = 100,
+							step = 5,
+							get = function(info)
+								if ShamanPowerExpiringAlertsDB then
+									return ShamanPowerExpiringAlertsDB.opacity or 100
+								end
+								return 100
+							end,
+							set = function(info, val)
+								if ShamanPowerExpiringAlertsDB then
+									ShamanPowerExpiringAlertsDB.opacity = val
+								end
+							end
+						},
+						alerts_font_outline = {
+							order = 9,
+							name = "Font Outline",
+							desc = "Add outline to text for better visibility",
+							type = "toggle",
+							width = 1.0,
+							get = function(info)
+								if ShamanPowerExpiringAlertsDB then
+									return ShamanPowerExpiringAlertsDB.fontOutline ~= false
+								end
+								return true
+							end,
+							set = function(info, val)
+								if ShamanPowerExpiringAlertsDB then
+									ShamanPowerExpiringAlertsDB.fontOutline = val
+									if ShamanPower.UpdateExpiringAlertsAppearance then
+										ShamanPower:UpdateExpiringAlertsAppearance()
+									end
+								end
+							end
+						},
+						alerts_header_shields = {
+							order = 10,
+							type = "header",
+							name = "Shield Alerts",
+						},
+						alerts_shields_enabled = {
+							order = 11,
+							name = "Enable Shield Alerts",
+							desc = "Show alerts when shields fade",
+							type = "toggle",
+							width = 1.0,
+							get = function(info)
+								if ShamanPowerExpiringAlertsDB and ShamanPowerExpiringAlertsDB.shields then
+									return ShamanPowerExpiringAlertsDB.shields.enabled ~= false
+								end
+								return true
+							end,
+							set = function(info, val)
+								if ShamanPowerExpiringAlertsDB then
+									if not ShamanPowerExpiringAlertsDB.shields then ShamanPowerExpiringAlertsDB.shields = {} end
+									ShamanPowerExpiringAlertsDB.shields.enabled = val
+								end
+							end
+						},
+						alerts_shields_lightning = {
+							order = 12,
+							name = "Lightning Shield",
+							desc = "Alert when Lightning Shield fades",
+							type = "toggle",
+							width = 1.0,
+							get = function(info)
+								if ShamanPowerExpiringAlertsDB and ShamanPowerExpiringAlertsDB.shields then
+									return ShamanPowerExpiringAlertsDB.shields.lightning ~= false
+								end
+								return true
+							end,
+							set = function(info, val)
+								if ShamanPowerExpiringAlertsDB then
+									if not ShamanPowerExpiringAlertsDB.shields then ShamanPowerExpiringAlertsDB.shields = {} end
+									ShamanPowerExpiringAlertsDB.shields.lightning = val
+								end
+							end
+						},
+						alerts_shields_water = {
+							order = 13,
+							name = "Water Shield",
+							desc = "Alert when Water Shield fades",
+							type = "toggle",
+							width = 1.0,
+							get = function(info)
+								if ShamanPowerExpiringAlertsDB and ShamanPowerExpiringAlertsDB.shields then
+									return ShamanPowerExpiringAlertsDB.shields.water ~= false
+								end
+								return true
+							end,
+							set = function(info, val)
+								if ShamanPowerExpiringAlertsDB then
+									if not ShamanPowerExpiringAlertsDB.shields then ShamanPowerExpiringAlertsDB.shields = {} end
+									ShamanPowerExpiringAlertsDB.shields.water = val
+								end
+							end
+						},
+						alerts_shields_earth = {
+							order = 14,
+							name = "Earth Shield (on target)",
+							desc = "Alert when Earth Shield fades on your assigned target",
+							type = "toggle",
+							width = 1.0,
+							get = function(info)
+								if ShamanPowerExpiringAlertsDB and ShamanPowerExpiringAlertsDB.shields then
+									return ShamanPowerExpiringAlertsDB.shields.earthShield ~= false
+								end
+								return true
+							end,
+							set = function(info, val)
+								if ShamanPowerExpiringAlertsDB then
+									if not ShamanPowerExpiringAlertsDB.shields then ShamanPowerExpiringAlertsDB.shields = {} end
+									ShamanPowerExpiringAlertsDB.shields.earthShield = val
+								end
+							end
+						},
+						alerts_shields_sound = {
+							order = 15,
+							name = "Play Sound",
+							desc = "Play a sound when shield alerts appear",
+							type = "toggle",
+							width = 1.0,
+							get = function(info)
+								if ShamanPowerExpiringAlertsDB and ShamanPowerExpiringAlertsDB.shields then
+									return ShamanPowerExpiringAlertsDB.shields.sound or false
+								end
+								return true
+							end,
+							set = function(info, val)
+								if ShamanPowerExpiringAlertsDB then
+									if not ShamanPowerExpiringAlertsDB.shields then ShamanPowerExpiringAlertsDB.shields = {} end
+									ShamanPowerExpiringAlertsDB.shields.sound = val
+								end
+							end
+						},
+						alerts_header_totems = {
+							order = 20,
+							type = "header",
+							name = "Totem Alerts",
+						},
+						alerts_totems_enabled = {
+							order = 21,
+							name = "Enable Totem Alerts",
+							desc = "Show alerts when totems are destroyed or expire",
+							type = "toggle",
+							width = 1.0,
+							get = function(info)
+								if ShamanPowerExpiringAlertsDB and ShamanPowerExpiringAlertsDB.totems then
+									return ShamanPowerExpiringAlertsDB.totems.enabled ~= false
+								end
+								return true
+							end,
+							set = function(info, val)
+								if ShamanPowerExpiringAlertsDB then
+									if not ShamanPowerExpiringAlertsDB.totems then ShamanPowerExpiringAlertsDB.totems = {} end
+									ShamanPowerExpiringAlertsDB.totems.enabled = val
+								end
+							end
+						},
+						alerts_totems_destroyed = {
+							order = 22,
+							name = "Totem Destroyed",
+							desc = "Alert when a totem is destroyed by enemies",
+							type = "toggle",
+							width = 1.0,
+							get = function(info)
+								if ShamanPowerExpiringAlertsDB and ShamanPowerExpiringAlertsDB.totems then
+									return ShamanPowerExpiringAlertsDB.totems.destroyed ~= false
+								end
+								return true
+							end,
+							set = function(info, val)
+								if ShamanPowerExpiringAlertsDB then
+									if not ShamanPowerExpiringAlertsDB.totems then ShamanPowerExpiringAlertsDB.totems = {} end
+									ShamanPowerExpiringAlertsDB.totems.destroyed = val
+								end
+							end
+						},
+						alerts_totems_expired = {
+							order = 23,
+							name = "Totem Expired",
+							desc = "Alert when a totem expires naturally (can be spammy)",
+							type = "toggle",
+							width = 1.0,
+							get = function(info)
+								if ShamanPowerExpiringAlertsDB and ShamanPowerExpiringAlertsDB.totems then
+									return ShamanPowerExpiringAlertsDB.totems.expired or false
+								end
+								return false
+							end,
+							set = function(info, val)
+								if ShamanPowerExpiringAlertsDB then
+									if not ShamanPowerExpiringAlertsDB.totems then ShamanPowerExpiringAlertsDB.totems = {} end
+									ShamanPowerExpiringAlertsDB.totems.expired = val
+								end
+							end
+						},
+						alerts_totems_earth = {
+							order = 24,
+							name = "Earth Totems",
+							desc = "Track Earth element totems",
+							type = "toggle",
+							width = 1.0,
+							get = function(info)
+								if ShamanPowerExpiringAlertsDB and ShamanPowerExpiringAlertsDB.totems then
+									return ShamanPowerExpiringAlertsDB.totems.earth ~= false
+								end
+								return true
+							end,
+							set = function(info, val)
+								if ShamanPowerExpiringAlertsDB then
+									if not ShamanPowerExpiringAlertsDB.totems then ShamanPowerExpiringAlertsDB.totems = {} end
+									ShamanPowerExpiringAlertsDB.totems.earth = val
+								end
+							end
+						},
+						alerts_totems_fire = {
+							order = 25,
+							name = "Fire Totems",
+							desc = "Track Fire element totems",
+							type = "toggle",
+							width = 1.0,
+							get = function(info)
+								if ShamanPowerExpiringAlertsDB and ShamanPowerExpiringAlertsDB.totems then
+									return ShamanPowerExpiringAlertsDB.totems.fire ~= false
+								end
+								return true
+							end,
+							set = function(info, val)
+								if ShamanPowerExpiringAlertsDB then
+									if not ShamanPowerExpiringAlertsDB.totems then ShamanPowerExpiringAlertsDB.totems = {} end
+									ShamanPowerExpiringAlertsDB.totems.fire = val
+								end
+							end
+						},
+						alerts_totems_water = {
+							order = 26,
+							name = "Water Totems",
+							desc = "Track Water element totems",
+							type = "toggle",
+							width = 1.0,
+							get = function(info)
+								if ShamanPowerExpiringAlertsDB and ShamanPowerExpiringAlertsDB.totems then
+									return ShamanPowerExpiringAlertsDB.totems.water ~= false
+								end
+								return true
+							end,
+							set = function(info, val)
+								if ShamanPowerExpiringAlertsDB then
+									if not ShamanPowerExpiringAlertsDB.totems then ShamanPowerExpiringAlertsDB.totems = {} end
+									ShamanPowerExpiringAlertsDB.totems.water = val
+								end
+							end
+						},
+						alerts_totems_air = {
+							order = 27,
+							name = "Air Totems",
+							desc = "Track Air element totems",
+							type = "toggle",
+							width = 1.0,
+							get = function(info)
+								if ShamanPowerExpiringAlertsDB and ShamanPowerExpiringAlertsDB.totems then
+									return ShamanPowerExpiringAlertsDB.totems.air ~= false
+								end
+								return true
+							end,
+							set = function(info, val)
+								if ShamanPowerExpiringAlertsDB then
+									if not ShamanPowerExpiringAlertsDB.totems then ShamanPowerExpiringAlertsDB.totems = {} end
+									ShamanPowerExpiringAlertsDB.totems.air = val
+								end
+							end
+						},
+						alerts_totems_sound = {
+							order = 28,
+							name = "Play Sound",
+							desc = "Play a sound when totem alerts appear",
+							type = "toggle",
+							width = 1.0,
+							get = function(info)
+								if ShamanPowerExpiringAlertsDB and ShamanPowerExpiringAlertsDB.totems then
+									return ShamanPowerExpiringAlertsDB.totems.sound or false
+								end
+								return true
+							end,
+							set = function(info, val)
+								if ShamanPowerExpiringAlertsDB then
+									if not ShamanPowerExpiringAlertsDB.totems then ShamanPowerExpiringAlertsDB.totems = {} end
+									ShamanPowerExpiringAlertsDB.totems.sound = val
+								end
+							end
+						},
+						alerts_header_imbues = {
+							order = 30,
+							type = "header",
+							name = "Weapon Imbue Alerts",
+						},
+						alerts_imbues_enabled = {
+							order = 31,
+							name = "Enable Imbue Alerts",
+							desc = "Show alerts when weapon imbues fade",
+							type = "toggle",
+							width = 1.0,
+							get = function(info)
+								if ShamanPowerExpiringAlertsDB and ShamanPowerExpiringAlertsDB.weaponImbues then
+									return ShamanPowerExpiringAlertsDB.weaponImbues.enabled ~= false
+								end
+								return true
+							end,
+							set = function(info, val)
+								if ShamanPowerExpiringAlertsDB then
+									if not ShamanPowerExpiringAlertsDB.weaponImbues then ShamanPowerExpiringAlertsDB.weaponImbues = {} end
+									ShamanPowerExpiringAlertsDB.weaponImbues.enabled = val
+								end
+							end
+						},
+						alerts_imbues_mainhand = {
+							order = 32,
+							name = "Main Hand",
+							desc = "Alert when main hand weapon imbue fades",
+							type = "toggle",
+							width = 1.0,
+							get = function(info)
+								if ShamanPowerExpiringAlertsDB and ShamanPowerExpiringAlertsDB.weaponImbues then
+									return ShamanPowerExpiringAlertsDB.weaponImbues.mainHand ~= false
+								end
+								return true
+							end,
+							set = function(info, val)
+								if ShamanPowerExpiringAlertsDB then
+									if not ShamanPowerExpiringAlertsDB.weaponImbues then ShamanPowerExpiringAlertsDB.weaponImbues = {} end
+									ShamanPowerExpiringAlertsDB.weaponImbues.mainHand = val
+								end
+							end
+						},
+						alerts_imbues_offhand = {
+							order = 33,
+							name = "Off Hand",
+							desc = "Alert when off hand weapon imbue fades",
+							type = "toggle",
+							width = 1.0,
+							get = function(info)
+								if ShamanPowerExpiringAlertsDB and ShamanPowerExpiringAlertsDB.weaponImbues then
+									return ShamanPowerExpiringAlertsDB.weaponImbues.offHand ~= false
+								end
+								return true
+							end,
+							set = function(info, val)
+								if ShamanPowerExpiringAlertsDB then
+									if not ShamanPowerExpiringAlertsDB.weaponImbues then ShamanPowerExpiringAlertsDB.weaponImbues = {} end
+									ShamanPowerExpiringAlertsDB.weaponImbues.offHand = val
+								end
+							end
+						},
+						alerts_imbues_sound = {
+							order = 34,
+							name = "Play Sound",
+							desc = "Play a sound when weapon imbue alerts appear",
+							type = "toggle",
+							width = 1.0,
+							get = function(info)
+								if ShamanPowerExpiringAlertsDB and ShamanPowerExpiringAlertsDB.weaponImbues then
+									return ShamanPowerExpiringAlertsDB.weaponImbues.sound or false
+								end
+								return true
+							end,
+							set = function(info, val)
+								if ShamanPowerExpiringAlertsDB then
+									if not ShamanPowerExpiringAlertsDB.weaponImbues then ShamanPowerExpiringAlertsDB.weaponImbues = {} end
+									ShamanPowerExpiringAlertsDB.weaponImbues.sound = val
+								end
+							end
+						},
+						alerts_header_testing = {
+							order = 40,
+							type = "header",
+							name = "Testing & Position",
+						},
+						alerts_test = {
+							order = 41,
+							type = "execute",
+							name = "Test Alerts",
+							desc = "Show test alerts for each type",
+							func = function()
+								if ShamanPower.ExpiringAlertsTest then
+									ShamanPower:ExpiringAlertsTest()
+								end
+							end
+						},
+						alerts_show_pos = {
+							order = 42,
+							type = "execute",
+							name = "Show Position Frame",
+							desc = "Show the positioning frame to drag alerts to a new location",
+							func = function()
+								if ShamanPower.ExpiringAlertsShow then
+									ShamanPower:ExpiringAlertsShow()
+								end
+							end
+						},
+						alerts_hide_pos = {
+							order = 43,
+							type = "execute",
+							name = "Hide Position Frame",
+							desc = "Hide the positioning frame",
+							func = function()
+								if ShamanPower.ExpiringAlertsHide then
+									ShamanPower:ExpiringAlertsHide()
+								end
+							end
+						},
+						alerts_reset_pos = {
+							order = 44,
+							type = "execute",
+							name = "Reset Position",
+							desc = "Reset alert position to default (center of screen)",
+							func = function()
+								if ShamanPower.ExpiringAlertsReset then
+									ShamanPower:ExpiringAlertsReset()
+								end
+							end
+						},
+					}
+				},
+				tremorreminder_section = {
+					order = 19.5,
+					name = "|cff0070ddTremor Reminder|r",
+					type = "group",
+					args = {
+						tremor_desc = {
+							order = 0,
+							type = "description",
+							name = "Proactive Tremor Totem reminder when targeting fear-casting mobs. Shows a reminder icon before anyone in your party gets feared.\n\n|cffff8800Note:|r Requires the |cff00ff00ShamanPower [Tremor Reminder]|r module to be enabled in your AddOns list.\n",
+						},
+						tremor_enabled = {
+							order = 1,
+							name = "Enable Tremor Reminder",
+							desc = "Show reminder when targeting known fear-casting mobs",
+							type = "toggle",
+							width = "full",
+							get = function(info)
+								if ShamanPowerTremorReminderDB then
+									return ShamanPowerTremorReminderDB.enabled ~= false
+								end
+								return true
+							end,
+							set = function(info, val)
+								if ShamanPowerTremorReminderDB then
+									ShamanPowerTremorReminderDB.enabled = val
+								end
+							end
+						},
+						tremor_hide_when_active = {
+							order = 2,
+							name = "Hide When Tremor Active",
+							desc = "Hide the reminder when Tremor Totem is already placed",
+							type = "toggle",
+							width = "full",
+							get = function(info)
+								if ShamanPowerTremorReminderDB then
+									return ShamanPowerTremorReminderDB.hideWhenTremorActive ~= false
+								end
+								return true
+							end,
+							set = function(info, val)
+								if ShamanPowerTremorReminderDB then
+									ShamanPowerTremorReminderDB.hideWhenTremorActive = val
+								end
+							end
+						},
+						tremor_use_defaults = {
+							order = 3,
+							name = "Use Default Mob List",
+							desc = "Include the built-in list of TBC fear-casting mobs",
+							type = "toggle",
+							width = "full",
+							get = function(info)
+								if ShamanPowerTremorReminderDB then
+									return ShamanPowerTremorReminderDB.useDefaultList ~= false
+								end
+								return true
+							end,
+							set = function(info, val)
+								if ShamanPowerTremorReminderDB then
+									ShamanPowerTremorReminderDB.useDefaultList = val
+								end
+							end
+						},
+						tremor_display_mode = {
+							order = 4,
+							name = "Display Mode",
+							desc = "How to display the reminder",
+							type = "select",
+							width = 1.5,
+							values = {
+								icon = "Icon Only",
+								text = "Text Only",
+								both = "Icon + Text",
+							},
+							get = function(info)
+								if ShamanPowerTremorReminderDB then
+									return ShamanPowerTremorReminderDB.displayMode or "icon"
+								end
+								return "icon"
+							end,
+							set = function(info, val)
+								if ShamanPowerTremorReminderDB then
+									ShamanPowerTremorReminderDB.displayMode = val
+									if ShamanPower.UpdateTremorReminderAppearance then
+										ShamanPower:UpdateTremorReminderAppearance()
+									end
+								end
+							end
+						},
+						tremor_manage_mobs = {
+							order = 5,
+							type = "execute",
+							name = "Manage Mob List",
+							desc = "Open the fear-caster mob list manager to add or remove mobs",
+							func = function()
+								if ShamanPower.ShowMobList then
+									ShamanPower:ShowMobList()
+								else
+									print("|cffff8800ShamanPower:|r Tremor Reminder module not loaded.")
+								end
+							end
+						},
+						tremor_header_appearance = {
+							order = 10,
+							type = "header",
+							name = "Appearance",
+						},
+						tremor_icon_size = {
+							order = 11,
+							name = "Icon Size",
+							desc = "Size of the reminder icon",
+							type = "range",
+							min = 32,
+							max = 128,
+							step = 1,
+							width = 1.5,
+							get = function(info)
+								if ShamanPowerTremorReminderDB then
+									return ShamanPowerTremorReminderDB.iconSize or 64
+								end
+								return 64
+							end,
+							set = function(info, val)
+								if ShamanPowerTremorReminderDB then
+									ShamanPowerTremorReminderDB.iconSize = val
+									if ShamanPower.UpdateTremorReminderAppearance then
+										ShamanPower:UpdateTremorReminderAppearance()
+									end
+								end
+							end
+						},
+						tremor_scale = {
+							order = 12,
+							name = "Scale",
+							desc = "Scale multiplier for the reminder frame",
+							type = "range",
+							min = 0.5,
+							max = 2.0,
+							step = 0.1,
+							width = 1.5,
+							get = function(info)
+								if ShamanPowerTremorReminderDB then
+									return ShamanPowerTremorReminderDB.scale or 1.0
+								end
+								return 1.0
+							end,
+							set = function(info, val)
+								if ShamanPowerTremorReminderDB then
+									ShamanPowerTremorReminderDB.scale = val
+									if ShamanPower.UpdateTremorReminderAppearance then
+										ShamanPower:UpdateTremorReminderAppearance()
+									end
+								end
+							end
+						},
+						tremor_opacity = {
+							order = 13,
+							name = "Opacity",
+							desc = "Opacity of the reminder icon (50-100%)",
+							type = "range",
+							min = 50,
+							max = 100,
+							step = 5,
+							width = 1.5,
+							get = function(info)
+								if ShamanPowerTremorReminderDB then
+									return ShamanPowerTremorReminderDB.opacity or 100
+								end
+								return 100
+							end,
+							set = function(info, val)
+								if ShamanPowerTremorReminderDB then
+									ShamanPowerTremorReminderDB.opacity = val
+									if ShamanPower.UpdateTremorReminderAppearance then
+										ShamanPower:UpdateTremorReminderAppearance()
+									end
+								end
+							end
+						},
+						tremor_text_size = {
+							order = 14,
+							name = "Text Size",
+							desc = "Size of the reminder text (for Text or Icon+Text modes)",
+							type = "range",
+							min = 12,
+							max = 48,
+							step = 1,
+							width = 1.5,
+							get = function(info)
+								if ShamanPowerTremorReminderDB then
+									return ShamanPowerTremorReminderDB.textSize or 24
+								end
+								return 24
+							end,
+							set = function(info, val)
+								if ShamanPowerTremorReminderDB then
+									ShamanPowerTremorReminderDB.textSize = val
+									if ShamanPower.UpdateTremorReminderAppearance then
+										ShamanPower:UpdateTremorReminderAppearance()
+									end
+								end
+							end
+						},
+						tremor_header_glow = {
+							order = 20,
+							type = "header",
+							name = "Glow Effect",
+						},
+						tremor_show_glow = {
+							order = 21,
+							name = "Show Glow",
+							desc = "Show a pulsing glow effect around the icon",
+							type = "toggle",
+							width = 1.0,
+							get = function(info)
+								if ShamanPowerTremorReminderDB then
+									return ShamanPowerTremorReminderDB.showGlow ~= false
+								end
+								return true
+							end,
+							set = function(info, val)
+								if ShamanPowerTremorReminderDB then
+									ShamanPowerTremorReminderDB.showGlow = val
+									if ShamanPower.UpdateTremorReminderAppearance then
+										ShamanPower:UpdateTremorReminderAppearance()
+									end
+								end
+							end
+						},
+						tremor_glow_color = {
+							order = 22,
+							name = "Glow Color",
+							desc = "Color of the glow effect",
+							type = "color",
+							width = 1.0,
+							get = function(info)
+								if ShamanPowerTremorReminderDB and ShamanPowerTremorReminderDB.glowColor then
+									return ShamanPowerTremorReminderDB.glowColor.r or 1,
+									       ShamanPowerTremorReminderDB.glowColor.g or 0.8,
+									       ShamanPowerTremorReminderDB.glowColor.b or 0
+								end
+								return 1, 0.8, 0
+							end,
+							set = function(info, r, g, b)
+								if ShamanPowerTremorReminderDB then
+									if not ShamanPowerTremorReminderDB.glowColor then
+										ShamanPowerTremorReminderDB.glowColor = {}
+									end
+									ShamanPowerTremorReminderDB.glowColor.r = r
+									ShamanPowerTremorReminderDB.glowColor.g = g
+									ShamanPowerTremorReminderDB.glowColor.b = b
+									if ShamanPower.UpdateTremorReminderAppearance then
+										ShamanPower:UpdateTremorReminderAppearance()
+									end
+								end
+							end
+						},
+						tremor_header_sound = {
+							order = 30,
+							type = "header",
+							name = "Sound",
+						},
+						tremor_play_sound = {
+							order = 31,
+							name = "Play Sound",
+							desc = "Play a warning sound when targeting a fear-caster",
+							type = "toggle",
+							width = "full",
+							get = function(info)
+								if ShamanPowerTremorReminderDB then
+									return ShamanPowerTremorReminderDB.playSound ~= false
+								end
+								return true
+							end,
+							set = function(info, val)
+								if ShamanPowerTremorReminderDB then
+									ShamanPowerTremorReminderDB.playSound = val
+								end
+							end
+						},
+						tremor_header_commands = {
+							order = 40,
+							type = "header",
+							name = "Commands",
+						},
+						tremor_commands_desc = {
+							order = 41,
+							type = "description",
+							name = "|cff888888Slash Commands:|r\n" ..
+							       "  /sptremor show - Show frame for positioning\n" ..
+							       "  /sptremor test - Show test alert\n" ..
+							       "  /sptremor reset - Reset position\n" ..
+							       "  /sptremor add <mob> - Add mob to list\n" ..
+							       "  /sptremor remove <mob> - Remove mob\n" ..
+							       "  /sptremor list - Show all fear-casters\n",
+						},
+						tremor_test = {
+							order = 42,
+							type = "execute",
+							name = "Test Alert",
+							desc = "Show a test alert",
+							func = function()
+								if ShamanPower.TremorReminderTest then
+									ShamanPower:TremorReminderTest()
+								end
+							end
+						},
+						tremor_hide_test = {
+							order = 42.5,
+							type = "execute",
+							name = "Hide Alert",
+							desc = "Hide the test alert",
+							func = function()
+								if ShamanPower.TremorReminderHide then
+									ShamanPower:TremorReminderHide()
+								end
+							end
+						},
+						tremor_show_pos = {
+							order = 43,
+							type = "execute",
+							name = "Show Position Frame",
+							desc = "Show the positioning frame to drag to a new location",
+							func = function()
+								if ShamanPower.TremorReminderShow then
+									ShamanPower:TremorReminderShow()
+								end
+							end
+						},
+						tremor_reset_pos = {
+							order = 44,
+							type = "execute",
+							name = "Reset Position",
+							desc = "Reset position to default (center of screen)",
+							func = function()
+								if ShamanPower.TremorReminderReset then
+									ShamanPower:TremorReminderReset()
+								end
+							end
+						},
+						tremor_lock_pos = {
+							order = 45,
+							name = "Lock Position",
+							desc = "Prevent moving the frame with ALT+drag",
+							type = "toggle",
+							width = "full",
+							get = function(info)
+								if ShamanPowerTremorReminderDB then
+									return ShamanPowerTremorReminderDB.locked ~= false
+								end
+								return true
+							end,
+							set = function(info, val)
+								if ShamanPowerTremorReminderDB then
+									ShamanPowerTremorReminderDB.locked = val
+								end
+							end
+						},
+						tremor_reset_moblist = {
+							order = 46,
+							type = "execute",
+							width = "full",
+							name = "Reset Mob List to Defaults",
+							desc = "Remove all custom mobs and restore all removed default mobs",
+							confirm = true,
+							confirmText = "Are you sure you want to reset the mob list to defaults? This will remove all custom mobs you added and restore any default mobs you removed.",
+							func = function()
+								if ShamanPowerTremorReminderDB then
+									ShamanPowerTremorReminderDB.fearCasters = {}
+									if ShamanPower.RefreshMobList then
+										ShamanPower:RefreshMobList()
+									end
+									print("|cff0070ddShamanPower|r [Tremor Reminder]: Mob list reset to defaults.")
 								end
 							end
 						},

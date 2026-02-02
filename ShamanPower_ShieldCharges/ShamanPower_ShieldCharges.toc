@@ -1,4 +1,4 @@
-## Interface: 30403
+## Interface: 20505
 ## Author: taubut
 ## Title: |cff0070ddShamanPower|r |cffffd200[Shield Charge Display]|r
 ## Version: 1.5.4

@@ -5754,28 +5754,26 @@ function ShamanPower:UpdatePlayerTotemRange()
 	self.buffNameLowerCache = buffLowerCache
 
 	-- Track weapon enchant totems (need special weapon enchant check instead of buff check)
-	local isWindfuryAir = false      -- Air (4) with Windfury Totem
-	local isFlametongueFire = false  -- Fire (2) with Flametongue Totem
+	local isWeaponEnchantTotem = {false, false, false, false}  -- [element] = true if weapon enchant totem
 
 	-- Reset results and collect buff names
 	for element = 1, 4 do
 		results[element] = false
 		local slot = self.ElementToSlot[element]
 		local haveTotem, totemName = GetTotemInfo(slot)
-		if haveTotem then
-			buffNames[element] = self:GetActiveTotemBuffName(element)
-			-- Special case: Totems that apply weapon enchants instead of buffs
-			-- These need weapon enchant detection, not buff detection
-			if totemName then
-				if element == 4 and totemName:find("Windfury") then
-					-- Windfury Totem (Air) - applies weapon enchant
-					isWindfuryAir = true
-					buffNames[element] = nil  -- Clear buff name so we use weapon check
-				elseif element == 2 and totemName:find("Flametongue") then
-					-- Flametongue Totem (Fire) - applies weapon enchant
-					isFlametongueFire = true
-					buffNames[element] = nil  -- Clear buff name so we use weapon check
-				end
+		if haveTotem and totemName then
+			-- Check if this is a weapon enchant totem (Windfury or Flametongue)
+			if element == 4 and totemName:find("Windfury") then
+				-- Windfury Totem (Air) - applies weapon enchant, not a buff
+				isWeaponEnchantTotem[element] = true
+				buffNames[element] = nil
+			elseif element == 2 and totemName:find("Flametongue") then
+				-- Flametongue Totem (Fire) - applies weapon enchant, not a buff
+				isWeaponEnchantTotem[element] = true
+				buffNames[element] = nil
+			else
+				-- Standard totem - try to get buff name for range tracking
+				buffNames[element] = self:GetActiveTotemBuffName(element)
 			end
 		else
 			buffNames[element] = nil
@@ -5811,17 +5809,19 @@ function ShamanPower:UpdatePlayerTotemRange()
 		end
 	end
 
-	-- Special case: Check weapon enchant totems via GetWeaponEnchantInfo()
-	-- This uses the same detection as SPRange module
-	if isWindfuryAir or isFlametongueFire then
-		local hasWeaponEnchant = self:SPRangeHasWindfuryWeapon()
-		if isWindfuryAir then
-			results[4] = hasWeaponEnchant
-		end
-		if isFlametongueFire then
-			results[2] = hasWeaponEnchant
+	-- Check weapon enchant totems via GetWeaponEnchantInfo()
+	local hasWeaponEnchant = nil  -- Lazy load only if needed
+	for element = 1, 4 do
+		if isWeaponEnchantTotem[element] then
+			if hasWeaponEnchant == nil then
+				hasWeaponEnchant = self:SPRangeHasWindfuryWeapon()
+			end
+			results[element] = hasWeaponEnchant
 		end
 	end
+
+	-- Check if using Dynamic/TotemTimers mode (active totem shows on main icon)
+	local useActiveAsMain = self.opt.activeTotemAsMain
 
 	-- Now apply the results to icons
 	for element = 1, 4 do
@@ -5829,40 +5829,47 @@ function ShamanPower:UpdatePlayerTotemRange()
 		local haveTotem = slot and GetTotemInfo(slot)
 		local hasBuff = results[element]
 
-		-- Check if active overlay is showing
+		-- Determine if this element has trackable range
+		local hasTrackableRange = buffNames[element] or isWeaponEnchantTotem[element]
+
+		-- Check if active overlay is showing (different totem than assigned)
 		local activeOverlay = self.activeTotemOverlays and self.activeTotemOverlays[element]
 		local overlayActive = activeOverlay and activeOverlay.isActive
 
-		-- Determine if this element has trackable range (buff or weapon enchant check)
-		local hasTrackableRange = buffNames[element] or (element == 4 and isWindfuryAir) or (element == 2 and isFlametongueFire)
+		local totemBtn = self.totemButtons[element]
+		local iconTexture = totemBtn and totemBtn.icon
 
-		if overlayActive then
-			if haveTotem and activeOverlay.icon then
+		-- Determine which icon to update for range display:
+		-- - In useActiveAsMain mode: main icon shows active totem, update main icon
+		-- - In classic mode with overlay: overlay shows active totem, update overlay icon
+		-- - No overlay: update main icon
+		local updateMainIcon = not overlayActive or useActiveAsMain
+		local updateOverlayIcon = overlayActive and not useActiveAsMain
+
+		-- Update the appropriate icon based on trackability
+		if updateOverlayIcon and activeOverlay and activeOverlay.icon then
+			if haveTotem then
 				if hasTrackableRange then
 					activeOverlay.icon:SetDesaturated(not hasBuff)
-					if not hasBuff then
-						activeOverlay.icon:SetVertexColor(0.6, 0.6, 0.6)
-					else
-						activeOverlay.icon:SetVertexColor(1, 1, 1)
-					end
+					activeOverlay.icon:SetVertexColor(hasBuff and 1 or 0.6, hasBuff and 1 or 0.6, hasBuff and 1 or 0.6)
 				else
+					-- Non-trackable totem - always show normal (not greyed)
 					activeOverlay.icon:SetDesaturated(false)
 					activeOverlay.icon:SetVertexColor(1, 1, 1)
 				end
 			end
-		else
-			local totemBtn = self.totemButtons[element]
-			local iconTexture = totemBtn and totemBtn.icon
-			if iconTexture then
-				if haveTotem then
-					if hasTrackableRange then
-						iconTexture:SetDesaturated(not hasBuff)
-					else
-						iconTexture:SetDesaturated(false)
-					end
+		end
+
+		if updateMainIcon and iconTexture then
+			if haveTotem then
+				if hasTrackableRange then
+					iconTexture:SetDesaturated(not hasBuff)
 				else
+					-- Non-trackable totem - always show normal (not greyed)
 					iconTexture:SetDesaturated(false)
 				end
+			else
+				iconTexture:SetDesaturated(false)
 			end
 		end
 	end
@@ -15071,6 +15078,29 @@ if not ShamanPower.TotemPlatesLoaded then
 	ShamanPower.detectedNameplateAddon = "Blizzard"
 end
 
+-- Reactive Totems module stubs (loaded by ShamanPower_ReactiveTotems addon)
+-- Shows large totem icons when party members have fear, disease, or poison debuffs
+if not ShamanPower.ReactiveTotemsLoaded then
+	-- Provide stub functions when module not loaded
+	function ShamanPower:InitializeReactiveTotems() end
+	function ShamanPower:UpdateReactiveTotems() end
+	function ShamanPower:UpdateReactiveTotemAppearance() end
+	function ShamanPower:TestReactiveTotems() end
+	function ShamanPower:ResetReactiveTotemPositions() end
+	function ShamanPower:ShowAllReactiveFrames() end
+	function ShamanPower:HideAllReactiveFrames() end
+	function ShamanPower:ShowReactiveTotemsConfig()
+		print("|cffff8800ShamanPower:|r Reactive Totems module not loaded. Enable 'ShamanPower [Reactive Totems]' in your AddOns.")
+	end
+
+	-- Register slash commands (shows module not loaded message)
+	SLASH_SPREACTIVE1 = "/spreactive"
+	SLASH_SPREACTIVE2 = "/reactivetotem"
+	SlashCmdList["SPREACTIVE"] = function(msg)
+		ShamanPower:ShowReactiveTotemsConfig()
+	end
+end
+
 -- NOTE: The actual implementations of these functions are in:
 -- - ShamanPower_RaidCooldowns/ShamanPower_RaidCooldowns.lua
 -- - ShamanPower_SPRange/ShamanPower_SPRange.lua
@@ -15078,7 +15108,49 @@ end
 -- - ShamanPower_PartyRange/ShamanPower_PartyRange.lua
 -- - ShamanPower_ShieldCharges/ShamanPower_ShieldCharges.lua
 -- - ShamanPower_TotemPlates/ShamanPower_TotemPlates.lua
+-- - ShamanPower_ReactiveTotems/ShamanPower_ReactiveTotems.lua
+-- - ShamanPower_ExpiringAlerts/ShamanPower_ExpiringAlerts.lua
 -- When those modules are loaded, they override these stub functions.
+
+-- Expiring Alerts module stubs (loaded by ShamanPower_ExpiringAlerts addon)
+-- Shows scrolling combat text alerts when shields, totems, or weapon imbues expire
+if not ShamanPower.ExpiringAlertsLoaded then
+	-- Provide stub functions when module not loaded
+	function ShamanPower:InitExpiringAlerts() end
+	function ShamanPower:ExpiringAlertsUpdate() end
+	function ShamanPower:ExpiringAlertsTest() end
+	function ShamanPower:ExpiringAlertsReset() end
+	function ShamanPower:ExpiringAlertsShow() end
+	function ShamanPower:ExpiringAlertsHide() end
+	function ShamanPower:UpdateExpiringAlertsAppearance() end
+
+	-- Register slash commands (shows module not loaded message)
+	SLASH_SPALERTS1 = "/spalerts"
+	SLASH_SPALERTS2 = "/expiringalerts"
+	SlashCmdList["SPALERTS"] = function(msg)
+		print("|cffff8800ShamanPower:|r Expiring Alerts module not loaded. Enable 'ShamanPower [Expiring Alerts]' in your AddOns.")
+	end
+end
+
+-- Stub functions for TremorReminder module (when not loaded)
+if not ShamanPower.TremorReminderLoaded then
+	function ShamanPower:TremorReminderShow() end
+	function ShamanPower:TremorReminderHide() end
+	function ShamanPower:TremorReminderTest() end
+	function ShamanPower:TremorReminderReset() end
+	function ShamanPower:UpdateTremorReminderAppearance() end
+	function ShamanPower:GetDefaultFearCasters() return {} end
+	function ShamanPower:GetCustomFearCasters() return {} end
+	function ShamanPower:ShowMobList() end
+	function ShamanPower:HideMobList() end
+	function ShamanPower:ToggleMobList() end
+	function ShamanPower:RefreshMobList() end
+
+	SLASH_SPTREMOR1 = "/sptremor"
+	SlashCmdList["SPTREMOR"] = function(msg)
+		print("|cffff8800ShamanPower:|r Tremor Reminder module not loaded. Enable 'ShamanPower [Tremor Reminder]' in your AddOns.")
+	end
+end
 
 
 -- ============================================================================
