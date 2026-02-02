@@ -2398,20 +2398,22 @@ function ShamanPower:UpdateTwistTimer()
 	-- Check if Air totem is active (slot 4)
 	local haveTotem, name, startTime, duration = GetTotemInfo(4)
 
-	-- Update the Air button icon based on what's currently down
-	local airButton = self.totemButtons[4]
-	local iconTexture = airButton and airButton.icon
-	if iconTexture then
-		if haveTotem and name then
-			if name:find("Windfury") then
-				iconTexture:SetTexture("Interface\\Icons\\Spell_Nature_InvisibilityTotem")
-			elseif name:find("Grace") then
-				iconTexture:SetTexture("Interface\\Icons\\Spell_Nature_Windfury")
-			else
-				iconTexture:SetTexture("Interface\\Icons\\Spell_Nature_Windfury")
+	-- Only update icon in classic mode (not TotemTimers mode)
+	-- In TotemTimers mode, UpdateActiveTotemOverlays handles the icon
+	if not self.opt.activeTotemAsMain then
+		local airButton = self.totemButtons[4]
+		local iconTexture = airButton and airButton.icon
+		if iconTexture then
+			if haveTotem and name then
+				if name:find("Windfury") then
+					-- WF is down, show GoA icon (what to cast next)
+					iconTexture:SetTexture("Interface\\Icons\\Spell_Nature_InvisibilityTotem")
+				elseif name:find("Grace") then
+					-- GoA is down, show WF icon (what to cast next)
+					iconTexture:SetTexture("Interface\\Icons\\Spell_Nature_Windfury")
+				end
+				-- Don't change icon for other Air totems - let them show naturally
 			end
-		else
-			iconTexture:SetTexture("Interface\\Icons\\Spell_Nature_Windfury")
 		end
 	end
 
@@ -3361,9 +3363,13 @@ function ShamanPower:UpdateActiveTotemOverlays()
 					end
 				end
 
-				-- Special case: totem twisting on Air
-				if element == 4 and self.opt and self.opt.enableTotemTwisting then
-					-- Twisting can have either Windfury or Grace of Air active
+				-- Special case: totem twisting on Air with TotemTimers mode
+				-- In this mode, the main icon always shows the active totem, so no overlay needed
+				if element == 4 and self.opt and self.opt.enableTotemTwisting and self.opt.activeTotemAsMain then
+					-- Any Air totem matches - the main icon will show whatever is active
+					matches = true
+				elseif element == 4 and self.opt and self.opt.enableTotemTwisting then
+					-- Classic mode: only Windfury/Grace of Air match for twisting
 					if totemName:find("Windfury") or totemName:find("Grace of Air") then
 						matches = true
 					end
@@ -3476,8 +3482,28 @@ function ShamanPower:UpdateActiveTotemOverlays()
 				if useActiveAsMain and totemButton and iconTexture then
 					-- Special case: Air totem with twisting - show the currently active totem icon
 					if element == 4 and self.opt.enableTotemTwisting and haveTotem and totemName then
-						-- Get icon for the currently active totem (Windfury or Grace of Air)
-						local _, _, activeTotemIcon = GetSpellInfo(totemName)
+						-- Find the icon for the active totem by searching through known totems
+						local activeTotemIcon = nil
+						local totems = self.Totems[element]
+						if totems then
+							for idx, totemSpellID in pairs(totems) do
+								if totemSpellID and type(totemSpellID) == "number" then
+									local totemSpellName = GetSpellInfo(totemSpellID)
+									if totemSpellName then
+										local ok, found = pcall(string.find, totemName, totemSpellName, 1, true)
+										if ok and found then
+											activeTotemIcon = self:GetTotemIcon(element, idx)
+											break
+										end
+									end
+								end
+							end
+						end
+						-- Fallback: try GetSpellInfo directly
+						if not activeTotemIcon then
+							local _, _, icon = GetSpellInfo(totemName)
+							activeTotemIcon = icon
+						end
 						if activeTotemIcon then
 							iconTexture:SetTexture(activeTotemIcon)
 						end
