@@ -14370,6 +14370,26 @@ function ShamanPower:MigrateMacroIcons()
 	print("|cff00ff00ShamanPower:|r Macro icons updated to use dynamic spell icons.")
 end
 
+-- Migrate macro reset timers to reset=combat/15 (one-time migration for v1.5.6)
+function ShamanPower:MigrateMacroResetTimers()
+	if InCombatLockdown() then return end
+
+	-- Check if already migrated
+	if self.opt and self.opt.macroResetMigrationV156 then
+		return
+	end
+
+	-- Force update all macros (will use new reset=combat/15)
+	self:UpdateSPMacros()
+
+	-- Set migration flag
+	if self.opt then
+		self.opt.macroResetMigrationV156 = true
+	end
+
+	print("|cff00ff00ShamanPower:|r Macro reset timers updated (reset=combat/15).")
+end
+
 -- Create or update a WoW macro
 function ShamanPower:CreateOrUpdateMacro(name, icon, body)
 	if InCombatLockdown() then return end
@@ -15166,6 +15186,12 @@ keybindEventFrame:SetScript("OnEvent", function(self, event, arg1)
 		C_Timer.After(3.0, function()
 			if ShamanPower.MigrateMacroIcons then
 				ShamanPower:MigrateMacroIcons()
+			end
+		end)
+		-- One-time migration of macro reset timers to reset=combat/15 (v1.5.6)
+		C_Timer.After(3.5, function()
+			if ShamanPower.MigrateMacroResetTimers then
+				ShamanPower:MigrateMacroResetTimers()
 			end
 		end)
 	end

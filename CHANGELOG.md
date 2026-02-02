@@ -20,6 +20,7 @@
 - **Improved macro reset timers**: Drop All and Twist macros now use `reset=combat/15` instead of just combat reset
   - Macros will reset 15 seconds after last use OR when leaving combat, whichever comes first
   - Prevents macros from getting stuck mid-sequence if combat ends unexpectedly
+  - One-time automatic migration for existing users updating from v1.5.5 or earlier
 
 ### Bug Fixes
 - **TotemTimers style + Twisting fix**: Fixed Air totem icon rapidly flickering when both "TotemTimers Style Display" and "Twist" options are enabled
