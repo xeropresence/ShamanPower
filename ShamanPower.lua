@@ -506,10 +506,14 @@ function ShamanPower:OnCombatEnd()
 	-- Force rebuild of the Drop All macro to reset the castsequence
 	self.dropAllLastMacro = ""
 	self:UpdateDropAllButton()
-	-- Deferred cooldown bar layout update if it was blocked during combat
+	-- Deferred cooldown bar updates if blocked during combat
 	if self.cdbarLayoutPending then
 		self.cdbarLayoutPending = false
 		self:UpdateCooldownBarLayout()
+	end
+	if self.cdbarVisibilityPending then
+		self.cdbarVisibilityPending = false
+		self:UpdateCooldownBar()
 	end
 end
 
@@ -7693,6 +7697,12 @@ function ShamanPower:UpdateCooldownBar()
 		-- Update the button layout first
 		self:UpdateCooldownBarLayout()
 
+		-- Defer Show/Hide/positioning if in combat (secure frame)
+		if InCombatLockdown() then
+			self.cdbarVisibilityPending = true
+			return
+		end
+
 		-- Position based on lock state
 		if self.opt.cooldownBarLocked then
 			-- Locked: anchor to totem bar based on layout orientation
@@ -7725,6 +7735,10 @@ function ShamanPower:UpdateCooldownBar()
 		-- Apply scale
 		self:UpdateCooldownBarScale()
 	else
+		if InCombatLockdown() then
+			self.cdbarVisibilityPending = true
+			return
+		end
 		self.cooldownBar:Hide()
 		self:DisableUpdateSubsystem("cooldownBar")
 	end
