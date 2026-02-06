@@ -16,6 +16,8 @@ ShamanPower_RangeTracker = ShamanPower_RangeTracker or {}
 
 -- Trackable totems with their detection methods
 -- detection: "buff" = check for buff, "weapon" = check weapon enchant
+-- buffSpellID: the BUFF spell ID (aura on party members), NOT the cast spell ID
+-- buffName is resolved at load time via GetSpellInfo (same approach as TotemTimers)
 SP.TrackableTotems = {
 	-- Earth
 	{
@@ -25,7 +27,7 @@ SP.TrackableTotems = {
 		index = 1,
 		spellID = 8075,
 		detection = "buff",
-		buffName = "Strength of Earth",
+		buffSpellID = 8076,
 	},
 	{
 		id = "stoneskin",
@@ -34,7 +36,7 @@ SP.TrackableTotems = {
 		index = 2,
 		spellID = 8071,
 		detection = "buff",
-		buffName = "Stoneskin",
+		buffSpellID = 8072,
 	},
 	-- Fire
 	{
@@ -44,7 +46,7 @@ SP.TrackableTotems = {
 		index = 1,
 		spellID = 30706,
 		detection = "buff",
-		buffName = "Totem of Wrath",
+		buffSpellID = 30708,
 	},
 	{
 		id = "flametongue",
@@ -53,7 +55,7 @@ SP.TrackableTotems = {
 		index = 5,
 		spellID = 8227,
 		detection = "buff",
-		buffName = "Flametongue Totem",
+		buffSpellID = 8215,
 	},
 	{
 		id = "frostresist",
@@ -62,7 +64,7 @@ SP.TrackableTotems = {
 		index = 6,
 		spellID = 8181,
 		detection = "buff",
-		buffName = "Frost Resistance",
+		buffSpellID = 8182,
 	},
 	-- Water
 	{
@@ -72,7 +74,7 @@ SP.TrackableTotems = {
 		index = 1,
 		spellID = 5675,
 		detection = "buff",
-		buffName = "Mana Spring",
+		buffSpellID = 5677,
 	},
 	{
 		id = "healingstream",
@@ -81,7 +83,7 @@ SP.TrackableTotems = {
 		index = 2,
 		spellID = 5394,
 		detection = "buff",
-		buffName = "Healing Stream",
+		buffSpellID = 5672,
 	},
 	{
 		id = "fireresist",
@@ -90,7 +92,7 @@ SP.TrackableTotems = {
 		index = 6,
 		spellID = 8184,
 		detection = "buff",
-		buffName = "Fire Resistance",
+		buffSpellID = 8185,
 	},
 	{
 		id = "manatide",
@@ -99,7 +101,7 @@ SP.TrackableTotems = {
 		index = 3,
 		spellID = 16190,
 		detection = "buff",
-		buffName = "Mana Tide",
+		buffSpellID = 16191,
 	},
 	-- Air
 	{
@@ -109,7 +111,7 @@ SP.TrackableTotems = {
 		index = 1,
 		spellID = 8512,
 		detection = "weapon",  -- Special: check weapon enchant
-		buffName = "Windfury",
+		buffSpellID = 8513,
 	},
 	{
 		id = "graceofair",
@@ -118,7 +120,7 @@ SP.TrackableTotems = {
 		index = 2,
 		spellID = 8835,
 		detection = "buff",
-		buffName = "Grace of Air",
+		buffSpellID = 8836,
 	},
 	{
 		id = "wrathofair",
@@ -127,7 +129,7 @@ SP.TrackableTotems = {
 		index = 3,
 		spellID = 3738,
 		detection = "buff",
-		buffName = "Wrath of Air",
+		buffSpellID = 2895,
 	},
 	{
 		id = "tranquilair",
@@ -136,7 +138,7 @@ SP.TrackableTotems = {
 		index = 4,
 		spellID = 25908,
 		detection = "buff",
-		buffName = "Tranquil Air",
+		buffSpellID = 25909,
 	},
 	{
 		id = "natureresist",
@@ -145,7 +147,7 @@ SP.TrackableTotems = {
 		index = 6,
 		spellID = 10595,
 		detection = "buff",
-		buffName = "Nature Resistance",
+		buffSpellID = 10596,
 	},
 	{
 		id = "windwall",
@@ -154,9 +156,16 @@ SP.TrackableTotems = {
 		index = 7,
 		spellID = 15107,
 		detection = "buff",
-		buffName = "Windwall",
+		buffSpellID = 15108,
 	},
 }
+
+-- Resolve buff spell IDs to exact names via GetSpellInfo (same approach as TotemTimers)
+for _, totem in ipairs(SP.TrackableTotems) do
+	if totem.buffSpellID then
+		totem.buffName = GetSpellInfo(totem.buffSpellID)
+	end
+end
 
 -- Build lookup by ID
 SP.TrackableTotemsByID = {}
@@ -231,17 +240,14 @@ function SP:InitSPRange()
 	end
 end
 
--- Check if player has a specific buff (case-insensitive partial match)
+-- Check if player has a specific buff (same approach as TotemTimers)
 function SP:SPRangeHasBuff(buffName)
 	if not buffName then return false end
-	local searchLower = buffName:lower()
 
-	for i = 1, 40 do
+	for i = 1, 32 do
 		local name = UnitBuff("player", i)
 		if not name then break end
-		if name:lower():find(searchLower, 1, true) then
-			return true
-		end
+		if name == buffName then return true end
 	end
 	return false
 end
@@ -543,22 +549,15 @@ end
 
 -- Check if ANYONE in the group has a specific buff (indicates totem is down somewhere)
 -- Optimized: party1-4 works in both party AND raid (refers to subgroup in raids)
+-- Same approach as TotemTimers: exact name match with names resolved from buff spell IDs
 function SP:SPRangeAnyoneHasBuff(buffName)
 	if not buffName then return false end
 
-	-- Check player first using direct buff name lookup
-	if AuraUtil and AuraUtil.FindAuraByName then
-		if AuraUtil.FindAuraByName(buffName, "player") then
-			return true
-		end
-	else
-		for i = 1, 20 do
-			local name = UnitBuff("player", i)
-			if not name then break end
-			if name:find(buffName, 1, true) then
-				return true
-			end
-		end
+	-- Check player first
+	for i = 1, 32 do
+		local name = UnitBuff("player", i)
+		if not name then break end
+		if name == buffName then return true end
 	end
 
 	-- Check party/subgroup members (party1-4 works in both party and raid)
@@ -566,18 +565,10 @@ function SP:SPRangeAnyoneHasBuff(buffName)
 		for i = 1, 4 do
 			local unit = "party" .. i
 			if UnitExists(unit) then
-				if AuraUtil and AuraUtil.FindAuraByName then
-					if AuraUtil.FindAuraByName(buffName, unit) then
-						return true
-					end
-				else
-					for j = 1, 20 do
-						local name = UnitBuff(unit, j)
-						if not name then break end
-						if name:find(buffName, 1, true) then
-							return true
-						end
-					end
+				for j = 1, 32 do
+					local name = UnitBuff(unit, j)
+					if not name then break end
+					if name == buffName then return true end
 				end
 			end
 		end

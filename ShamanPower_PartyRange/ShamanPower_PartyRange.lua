@@ -15,39 +15,47 @@ SP.PartyRangeLoaded = true
 
 SP.partyRangeDots = {}  -- [element][partyIndex] = dot texture
 
--- Buff names that totems apply to party members (used for range detection)
--- Use partial names to match more reliably across different versions/localizations
--- NOTE: Some totems (like Windfury) don't apply visible buffs detectable via UnitBuff
-SP.TotemBuffNames = {
+-- Buff spell IDs for totem buffs (same approach as TotemTimers)
+-- These are the BUFF spell IDs (auras on party members), NOT the cast spell IDs
+SP.TotemBuffSpellIDs = {
 	[1] = {  -- Earth
-		[1] = "Strength of Earth",
-		[2] = "Stoneskin",
-		-- Tremor, Earthbind, Stoneclaw, Earth Elemental don't have party buffs
+		[1] = 8076,   -- Strength of Earth
+		[2] = 8072,   -- Stoneskin
 	},
 	[2] = {  -- Fire
-		[1] = "Totem of Wrath",
-		[5] = "Flametongue",
-		[6] = "Frost Resistance",
-		-- Searing, Magma, Fire Nova are damage totems with no party buff
+		[1] = 30708,  -- Totem of Wrath
+		[5] = 8215,   -- Flametongue
+		[6] = 8182,   -- Frost Resistance
 	},
 	[3] = {  -- Water
-		[1] = "Mana Spring",
-		[2] = "Healing Stream",  -- This heals, doesn't buff
-		[3] = "Mana Tide",
-		[6] = "Fire Resistance",
-		-- Poison/Disease cleansing don't have visible buffs
+		[1] = 5677,   -- Mana Spring
+		[2] = 5672,   -- Healing Stream
+		[3] = 16191,  -- Mana Tide
+		[6] = 8185,   -- Fire Resistance
 	},
 	[4] = {  -- Air
-		-- [1] = Windfury Totem - uses broadcast system since we can't check other players' buffs
-		[2] = "Grace of Air",
-		[3] = "Wrath of Air",
-		[4] = "Tranquil Air",
-		[6] = "Nature Resistance",
-		[7] = "Windwall",
+		[2] = 8836,   -- Grace of Air
+		[3] = 2895,   -- Wrath of Air
+		[4] = 25909,  -- Tranquil Air
+		[6] = 10596,  -- Nature Resistance
+		[7] = 15108,  -- Windwall
 	},
 }
 
--- Pre-computed lowercase versions to avoid string garbage during updates
+-- Resolve buff spell IDs to exact names via GetSpellInfo (same approach as TotemTimers)
+-- This guarantees exact name matching with UnitBuff results
+SP.TotemBuffNames = {}
+for element, buffs in pairs(SP.TotemBuffSpellIDs) do
+	SP.TotemBuffNames[element] = {}
+	for idx, spellId in pairs(buffs) do
+		local name = GetSpellInfo(spellId)
+		if name then
+			SP.TotemBuffNames[element][idx] = name
+		end
+	end
+end
+
+-- Pre-computed lowercase versions for totem name matching in GetActiveTotemBuffName
 SP.TotemBuffNamesLower = {}
 for element, buffs in pairs(SP.TotemBuffNames) do
 	SP.TotemBuffNamesLower[element] = {}
@@ -163,19 +171,13 @@ function SP:GetActiveTotemBuffName(element)
 	return nil
 end
 
--- Check if a unit has a specific buff
+-- Check if a unit has a specific buff (same approach as TotemTimers)
 function SP:UnitHasBuff(unit, buffName)
 	if not buffName then return false end
 
-	-- Use optimized API if available (Retail/newer Classic)
-	if AuraUtil and AuraUtil.FindAuraByName then
-		return AuraUtil.FindAuraByName(buffName, unit) ~= nil
-	end
-
-	-- Simple direct scan (same approach as TotemTimers)
-	for i = 1, 40 do
+	for i = 1, 32 do
 		local name = UnitBuff(unit, i)
-		if not name then return false end
+		if not name then break end
 		if name == buffName then return true end
 	end
 

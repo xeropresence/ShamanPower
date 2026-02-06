@@ -4,6 +4,7 @@
 
 ### Bug Fixes
 - **Cooldown bar combat lockdown protection**: Fixed taint errors where `Show()`/`Hide()` on the cooldown bar could be blocked during combat if another addon (e.g. Atlas) spread taint through the options panel; visibility updates are now deferred until combat ends
+- **Party Buff Tracker and Totem Range Tracker buff detection**: Fixed totem buff detection for Party Range dots and SPRange by using buff spell IDs resolved via `GetSpellInfo()` instead of hardcoded name strings; fixes Wrath of Air Totem and other totems whose buff names don't match the partial totem name
 
 ## v1.5.9 (2026-02-05)
 
