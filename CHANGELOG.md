@@ -3,7 +3,7 @@
 ## v1.6.0 (2026-02-05)
 
 ### Bug Fixes
-- **Cooldown bar combat lockdown protection**: Fixed a taint error where `SetSize()` on the cooldown bar could be blocked during combat if another addon (e.g. Atlas) spread taint; layout updates are now deferred until combat ends
+- **Cooldown bar combat lockdown protection**: Fixed taint errors where `SetSize()` and `Show()`/`Hide()` on the cooldown bar could be blocked during combat if another addon (e.g. Atlas) spread taint; layout and visibility updates are now deferred until combat ends
 
 ## v1.5.9 (2026-02-05)
 
