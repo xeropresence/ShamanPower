@@ -2,6 +2,615 @@ local L = LibStub("AceLocale-3.0"):GetLocale("ShamanPower")
 
 local isShaman = select(2, UnitClass("player")) == "SHAMAN"
 
+-- Shared args table for loadouts section (rebuilt in-place by RefreshLoadoutArgs)
+local loadoutArgs = {}
+
+-- Element names and color codes for totem dropdowns (matches TotemTimers ElementColors)
+local loadoutElementNames = {
+	[1] = "|cffb3804dEarth|r",  -- 0.7, 0.5, 0.3
+	[2] = "|cffff1a1aFire|r",   -- 1.0, 0.1, 0.1
+	[3] = "|cff6666ffWater|r",  -- 0.4, 0.4, 1.0
+	[4] = "|cffffffffAir|r",    -- 1.0, 1.0, 1.0
+}
+
+-- Build totem dropdown values for a given element
+local function GetTotemValues(element)
+	local values = { [0] = "None" }
+	local names = ShamanPower.TotemNames[element]
+	if names then
+		for idx, name in pairs(names) do
+			values[idx] = name
+		end
+	end
+	return values
+end
+
+-- Build sorted key list for totem dropdown
+local function GetTotemSorting(element)
+	local sorting = {0}
+	local names = ShamanPower.TotemNames[element]
+	if names then
+		for idx in pairs(names) do
+			tinsert(sorting, idx)
+		end
+	end
+	table.sort(sorting)
+	return sorting
+end
+
+-- Icon choices for custom loadout icons (element icons + common totems + "None" to reset)
+-- ============================================================================
+-- ICON PICKER POPUP (same as TotemTimers IconPicker.lua)
+-- Scrollable grid of icons for choosing a loadout icon
+-- ============================================================================
+local ICONS_PER_ROW = 6
+local ICON_SIZE = 36
+local ICON_SPACING = 4
+local VISIBLE_ROWS = 12
+local ROW_HEIGHT = ICON_SIZE + ICON_SPACING
+
+local allIcons = {}
+local filteredIcons = {}
+local iconPickerFrame = nil
+local currentCallback = nil
+local selectedIconIndex = nil
+
+local function BuildIconList()
+	if #allIcons > 0 then return end
+
+	-- Try WoW API first (returns hundreds of spell/item icons)
+	local macroIcons = GetMacroIcons and GetMacroIcons()
+	if macroIcons then
+		for i = 1, #macroIcons do
+			tinsert(allIcons, macroIcons[i])
+		end
+	end
+	local itemIcons = GetMacroItemIcons and GetMacroItemIcons()
+	if itemIcons then
+		for i = 1, #itemIcons do
+			tinsert(allIcons, itemIcons[i])
+		end
+	end
+
+	-- Fallback: hardcoded shaman-relevant icons (same as TotemTimers)
+	if #allIcons == 0 then
+		local commonIcons = {
+			"Interface\\Icons\\Spell_Nature_Lightning",
+			"Interface\\Icons\\Spell_Nature_ChainLightning",
+			"Interface\\Icons\\Spell_Fire_FlameShock",
+			"Interface\\Icons\\Spell_Nature_EarthShock",
+			"Interface\\Icons\\Spell_Frost_FrostShock2",
+			"Interface\\Icons\\Spell_Nature_MagicImmunity",
+			"Interface\\Icons\\Ability_Shaman_Stormstrike",
+			"Interface\\Icons\\Spell_Nature_LightningShield",
+			"Interface\\Icons\\Spell_Fire_Volcano",
+			"Interface\\Icons\\Spell_Nature_HealingWaveGreater",
+			"Interface\\Icons\\Spell_Nature_StoneSkinTotem",
+			"Interface\\Icons\\Spell_Fire_SearingTotem",
+			"Interface\\Icons\\Spell_Nature_ManaRegenTotem",
+			"Interface\\Icons\\Spell_Nature_InvisibilityTotem",
+			"Interface\\Icons\\Spell_Nature_Cyclone",
+			"Interface\\Icons\\Spell_Nature_EarthBindTotem",
+			"Interface\\Icons\\Spell_Nature_TremorTotem",
+			"Interface\\Icons\\Spell_Fire_SelfDestruct",
+			"Interface\\Icons\\Spell_Nature_GroundingTotem",
+			"Interface\\Icons\\Spell_Nature_Purge",
+			"Interface\\Icons\\Spell_Nature_SkinofEarth",
+			"Interface\\Icons\\Spell_Nature_Bloodlust",
+			"Interface\\Icons\\Spell_Nature_UnyeildingStamina",
+			"Interface\\Icons\\Spell_FireResistanceTotem_01",
+			"Interface\\Icons\\Spell_FrostResistanceTotem_01",
+			"Interface\\Icons\\Spell_Nature_NatureResistanceTotem",
+			"Interface\\Icons\\Spell_Nature_WispSplode",
+			"Interface\\Icons\\Spell_Fire_TotemOfWrath",
+			"Interface\\Icons\\Spell_Nature_ManaTide",
+			"Interface\\Icons\\Spell_Shaman_TotemRecall",
+			"Interface\\Icons\\Spell_Nature_EarthElemental_Totem",
+			"Interface\\Icons\\Spell_Fire_SealOfFire",
+			"Interface\\Icons\\Spell_Frost_SummonWaterElemental",
+			"Interface\\Icons\\Spell_Nature_Windfury",
+			"Interface\\Icons\\Spell_Nature_SlowingTotem",
+			"Interface\\Icons\\Spell_Nature_Brilliance",
+			"Interface\\Icons\\Spell_Fire_FlameTounge",
+			"Interface\\Icons\\ClassIcon_Shaman",
+			"Interface\\Icons\\ClassIcon_Warrior",
+			"Interface\\Icons\\ClassIcon_Paladin",
+			"Interface\\Icons\\ClassIcon_Hunter",
+			"Interface\\Icons\\ClassIcon_Rogue",
+			"Interface\\Icons\\ClassIcon_Priest",
+			"Interface\\Icons\\ClassIcon_Mage",
+			"Interface\\Icons\\ClassIcon_Warlock",
+			"Interface\\Icons\\ClassIcon_Druid",
+			"Interface\\Icons\\Ability_ThunderBolt",
+			"Interface\\Icons\\Ability_DualWield",
+			"Interface\\Icons\\Ability_Warrior_BattleShout",
+			"Interface\\Icons\\Achievement_PVP_A_A",
+			"Interface\\Icons\\Achievement_PVP_H_H",
+			"Interface\\Icons\\INV_BannerPVP_01",
+			"Interface\\Icons\\INV_BannerPVP_02",
+			"Interface\\Icons\\Spell_Holy_PrayerOfHealing",
+			"Interface\\Icons\\INV_Misc_Head_Dragon_01",
+			"Interface\\Icons\\INV_Misc_QuestionMark",
+			"Interface\\Icons\\INV_Shield_06",
+			"Interface\\Icons\\INV_Hammer_04",
+			"Interface\\Icons\\INV_Spear_04",
+			"Interface\\Icons\\Spell_Holy_MindSooth",
+			"Interface\\Icons\\Ability_Parry",
+			"Interface\\Icons\\Achievement_Zone_Durotar",
+			"Interface\\Icons\\Achievement_Zone_ElwynnForest",
+		}
+		for _, icon in ipairs(commonIcons) do
+			tinsert(allIcons, icon)
+		end
+	end
+
+	filteredIcons = allIcons
+end
+
+local function UpdateVisibleButtons()
+	if not iconPickerFrame then return end
+
+	local scrollFrame = iconPickerFrame.scrollFrame
+	local offset = scrollFrame:GetVerticalScroll()
+	local firstVisibleRow = math.floor(offset / ROW_HEIGHT)
+	local firstIconIndex = firstVisibleRow * ICONS_PER_ROW + 1
+
+	for i, btn in ipairs(iconPickerFrame.iconButtons) do
+		local iconIndex = firstIconIndex + i - 1
+		if iconIndex <= #filteredIcons then
+			local iconPath = filteredIcons[iconIndex]
+			btn.iconIndex = iconIndex
+			btn.iconPath = iconPath
+			btn.icon:SetTexture(iconPath)
+			if iconIndex == selectedIconIndex then
+				btn.border:Show()
+			else
+				btn.border:Hide()
+			end
+			btn:Show()
+		else
+			btn:Hide()
+		end
+	end
+end
+
+local function InitializeScrollFrame()
+	if not iconPickerFrame then return end
+	local scrollFrame = iconPickerFrame.scrollFrame
+	local numRows = math.ceil(#filteredIcons / ICONS_PER_ROW)
+	local totalHeight = numRows * ROW_HEIGHT
+	FauxScrollFrame_Update(scrollFrame, numRows, VISIBLE_ROWS, ROW_HEIGHT)
+	UpdateVisibleButtons()
+end
+
+local function CreateIconPickerFrame()
+	if iconPickerFrame then return end
+
+	local frameWidth = ICONS_PER_ROW * (ICON_SIZE + ICON_SPACING) + 50
+	local frameHeight = VISIBLE_ROWS * ROW_HEIGHT + 110
+
+	local frame = CreateFrame("Frame", "ShamanPower_IconPicker", UIParent, "BasicFrameTemplateWithInset")
+	frame:SetSize(frameWidth, frameHeight)
+	frame:SetFrameStrata("FULLSCREEN_DIALOG")
+	frame:SetMovable(true)
+	frame:EnableMouse(true)
+	frame:RegisterForDrag("LeftButton")
+	frame:SetScript("OnDragStart", frame.StartMoving)
+	frame:SetScript("OnDragStop", frame.StopMovingOrSizing)
+	frame:Hide()
+
+	frame.TitleText:SetText("Choose an Icon")
+
+	-- Currently selected icon display
+	local selectedBG = frame:CreateTexture(nil, "BACKGROUND")
+	selectedBG:SetSize(ICON_SIZE + 8, ICON_SIZE + 8)
+	selectedBG:SetPoint("TOPLEFT", frame, "TOPLEFT", 15, -35)
+	selectedBG:SetColorTexture(0.2, 0.2, 0.2, 1)
+
+	local selectedIcon = frame:CreateTexture(nil, "ARTWORK")
+	selectedIcon:SetSize(ICON_SIZE, ICON_SIZE)
+	selectedIcon:SetPoint("CENTER", selectedBG, "CENTER")
+	frame.selectedIcon = selectedIcon
+
+	local selectedLabel = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+	selectedLabel:SetPoint("LEFT", selectedBG, "RIGHT", 10, 0)
+	selectedLabel:SetText("Selected")
+
+	-- Container for icons (clips content)
+	local iconContainer = CreateFrame("Frame", nil, frame)
+	iconContainer:SetPoint("TOPLEFT", frame, "TOPLEFT", 15, -80)
+	iconContainer:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -35, 45)
+	iconContainer:SetClipsChildren(true)
+	frame.iconContainer = iconContainer
+
+	-- Scroll frame
+	local scrollFrame = CreateFrame("ScrollFrame", "ShamanPower_IconPickerScroll", frame, "FauxScrollFrameTemplate")
+	scrollFrame:SetPoint("TOPLEFT", iconContainer, "TOPLEFT", 0, 0)
+	scrollFrame:SetPoint("BOTTOMRIGHT", iconContainer, "BOTTOMRIGHT", -18, 0)
+	frame.scrollFrame = scrollFrame
+
+	-- Create visible icon buttons (enough for visible area + 1 row buffer)
+	local numVisibleButtons = ICONS_PER_ROW * (VISIBLE_ROWS + 1)
+	frame.iconButtons = {}
+
+	for i = 1, numVisibleButtons do
+		local btn = CreateFrame("Button", nil, iconContainer)
+		btn:SetSize(ICON_SIZE, ICON_SIZE)
+
+		local row = math.floor((i - 1) / ICONS_PER_ROW)
+		local col = (i - 1) % ICONS_PER_ROW
+		btn:SetPoint("TOPLEFT", iconContainer, "TOPLEFT", col * (ICON_SIZE + ICON_SPACING), -row * ROW_HEIGHT)
+
+		local icon = btn:CreateTexture(nil, "ARTWORK")
+		icon:SetAllPoints()
+		btn.icon = icon
+
+		local highlight = btn:CreateTexture(nil, "HIGHLIGHT")
+		highlight:SetAllPoints()
+		highlight:SetColorTexture(1, 1, 1, 0.3)
+
+		local border = btn:CreateTexture(nil, "OVERLAY")
+		border:SetSize(ICON_SIZE * 1.8, ICON_SIZE * 1.8)
+		border:SetPoint("CENTER")
+		border:SetTexture("Interface\\Buttons\\UI-ActionButton-Border")
+		border:SetBlendMode("ADD")
+		border:Hide()
+		btn.border = border
+
+		btn:SetScript("OnClick", function(self)
+			selectedIconIndex = self.iconIndex
+			frame.selectedIconPath = self.iconPath
+			frame.selectedIcon:SetTexture(self.iconPath)
+			for _, b in ipairs(frame.iconButtons) do
+				if b.iconIndex == selectedIconIndex then
+					b.border:Show()
+				else
+					b.border:Hide()
+				end
+			end
+			-- Apply immediately so the selection is stored even if user doesn't click Okay
+			if currentCallback and frame.selectedIconPath then
+				currentCallback(frame.selectedIconPath)
+			end
+		end)
+
+		btn:SetScript("OnEnter", function(self)
+			GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+			local path = self.iconPath
+			local name
+			if type(path) == "number" then
+				name = tostring(path)
+			elseif type(path) == "string" then
+				name = path:match("Interface\\Icons\\(.+)") or path
+			else
+				name = "Unknown"
+			end
+			GameTooltip:SetText(name)
+			GameTooltip:Show()
+		end)
+
+		btn:SetScript("OnLeave", function()
+			GameTooltip:Hide()
+		end)
+
+		frame.iconButtons[i] = btn
+	end
+
+	-- Scroll handler
+	scrollFrame:SetScript("OnVerticalScroll", function(self, offset)
+		FauxScrollFrame_OnVerticalScroll(self, offset, ROW_HEIGHT, function()
+			UpdateVisibleButtons()
+		end)
+	end)
+
+	-- Okay button
+	local okayButton = CreateFrame("Button", nil, frame, "GameMenuButtonTemplate")
+	okayButton:SetSize(80, 22)
+	okayButton:SetPoint("BOTTOMRIGHT", frame, "BOTTOM", -5, 12)
+	okayButton:SetText("Okay")
+	okayButton:SetScript("OnClick", function()
+		if currentCallback and frame.selectedIconPath then
+			currentCallback(frame.selectedIconPath)
+		end
+		frame:Hide()
+		ShamanPower:RefreshConfig()
+	end)
+
+	-- Cancel button
+	local cancelButton = CreateFrame("Button", nil, frame, "GameMenuButtonTemplate")
+	cancelButton:SetSize(80, 22)
+	cancelButton:SetPoint("BOTTOMLEFT", frame, "BOTTOM", 5, 12)
+	cancelButton:SetText("Cancel")
+	cancelButton:SetScript("OnClick", function()
+		frame:Hide()
+	end)
+
+	iconPickerFrame = frame
+end
+
+function ShamanPower:OpenIconPicker(loadoutIndex, callback)
+	BuildIconList()
+	CreateIconPickerFrame()
+
+	currentCallback = callback
+	selectedIconIndex = nil
+
+	-- Set current icon if loadout has one
+	local currentIcon
+	if loadoutIndex then
+		local set = ShamanPower_TotemLoadouts[loadoutIndex]
+		currentIcon = set and set.icon
+	else
+		currentIcon = ShamanPower._newLoadoutIcon
+	end
+	if currentIcon then
+		iconPickerFrame.selectedIconPath = currentIcon
+		iconPickerFrame.selectedIcon:SetTexture(currentIcon)
+		-- Find the index of the current icon
+		for i, icon in ipairs(filteredIcons) do
+			if icon == currentIcon then
+				selectedIconIndex = i
+				break
+			end
+		end
+	else
+		iconPickerFrame.selectedIconPath = nil
+		iconPickerFrame.selectedIcon:SetTexture("Interface\\Icons\\INV_Misc_QuestionMark")
+	end
+
+	InitializeScrollFrame()
+	-- Anchor to right side of config frame as a pop-out panel
+	iconPickerFrame:ClearAllPoints()
+	local configFrame = _G["ShamanPowerConfigFrame"]
+	if configFrame and configFrame:IsShown() then
+		iconPickerFrame:SetPoint("TOPLEFT", configFrame, "TOPRIGHT", -2, 0)
+	else
+		iconPickerFrame:SetPoint("CENTER")
+	end
+	iconPickerFrame:Show()
+	iconPickerFrame:Raise()
+end
+
+local function RefreshLoadoutArgs()
+	-- Guard: ShamanPower_TotemLoadouts may not exist yet at file load time (SavedVariable)
+	if not ShamanPower_TotemLoadouts then return end
+	-- Wipe and rebuild - preserves the table reference
+	wipe(loadoutArgs)
+
+	loadoutArgs.loadouts_desc = {
+		order = 0,
+		type = "description",
+		name = "Save and switch between personal totem loadouts (up to 8). Each loadout remembers your 4 assigned totems.\n\nUse |cffffd200/spl save <name>|r to save, |cffffd200/spl <name>|r to switch, or manage below.\n",
+	}
+	loadoutArgs.show_bar = {
+		order = 1,
+		type = "toggle",
+		name = "Show Loadout Bar",
+		desc = "Show the on-screen loadout flyout bar for quick switching between totem loadouts",
+		width = "full",
+		get = function(info)
+			return ShamanPower.opt.showLoadoutBar
+		end,
+		set = function(info, val)
+			ShamanPower.opt.showLoadoutBar = val
+			ShamanPower:UpdateLoadoutBar()
+		end
+	}
+	loadoutArgs.new_header = {
+		order = 2,
+		type = "header",
+		name = "Create New Loadout",
+	}
+	loadoutArgs.new_name = {
+		order = 3,
+		type = "input",
+		name = "Loadout Name",
+		desc = "Enter a name for the new loadout (e.g. 'Enhance', 'Resto')",
+		width = 1.2,
+		get = function(info)
+			return ShamanPower._newLoadoutName or ""
+		end,
+		set = function(info, val)
+			ShamanPower._newLoadoutName = val
+		end,
+	}
+	loadoutArgs.new_icon = {
+		order = 3.5,
+		type = "execute",
+		name = function()
+			local icon = ShamanPower._newLoadoutIcon or "Interface\\Icons\\INV_Misc_QuestionMark"
+			return "|T" .. icon .. ":16|t Icon"
+		end,
+		desc = "Click to choose an icon for the new loadout",
+		width = 0.5,
+		func = function()
+			ShamanPower:OpenIconPicker(nil, function(selectedIcon)
+				ShamanPower._newLoadoutIcon = selectedIcon
+				ShamanPower:RefreshConfig()
+			end)
+		end,
+	}
+	-- Pre-fill new loadout totems from current assignments
+	if not ShamanPower._newLoadoutTotems then
+		ShamanPower._newLoadoutTotems = {}
+		local assignments = ShamanPower_Assignments and ShamanPower_Assignments[ShamanPower.player]
+		for element = 1, 4 do
+			ShamanPower._newLoadoutTotems[element] = (assignments and assignments[element]) or 0
+		end
+	end
+	for element = 1, 4 do
+		local elem = element
+		loadoutArgs["new_totem_" .. elem] = {
+			order = 4 + elem * 0.1,
+			type = "select",
+			name = loadoutElementNames[elem],
+			width = 0.75,
+			values = GetTotemValues(elem),
+			sorting = GetTotemSorting(elem),
+			get = function(info)
+				return ShamanPower._newLoadoutTotems and ShamanPower._newLoadoutTotems[elem] or 0
+			end,
+			set = function(info, val)
+				if not ShamanPower._newLoadoutTotems then ShamanPower._newLoadoutTotems = {} end
+				ShamanPower._newLoadoutTotems[elem] = val
+			end,
+		}
+	end
+	loadoutArgs.create_loadout = {
+		order = 4.9,
+		type = "execute",
+		name = "Create Loadout",
+		desc = "Create a new loadout with the name, icon, and totems chosen above",
+		width = 1.0,
+		disabled = function()
+			return not ShamanPower_TotemLoadouts or #ShamanPower_TotemLoadouts >= 8
+		end,
+		func = function()
+			local name = ShamanPower._newLoadoutName
+			if name and name:trim() == "" then name = nil end
+			local icon = ShamanPower._newLoadoutIcon
+			local totems = ShamanPower._newLoadoutTotems or {}
+			ShamanPower:CreateLoadout(name, icon, totems)
+			-- Clear temp fields and re-fill from current assignments
+			ShamanPower._newLoadoutName = nil
+			ShamanPower._newLoadoutIcon = nil
+			ShamanPower._newLoadoutTotems = nil
+			RefreshLoadoutArgs()
+			ShamanPower:RefreshConfig()
+		end,
+	}
+	loadoutArgs.loadouts_header = {
+		order = 5,
+		type = "header",
+		name = "Saved Loadouts",
+		hidden = function() return not ShamanPower_TotemLoadouts or #ShamanPower_TotemLoadouts == 0 end,
+	}
+
+	-- Dynamically add per-loadout management controls
+	if ShamanPower_TotemLoadouts then
+		for i = 1, #ShamanPower_TotemLoadouts do
+			local idx = i
+			local baseOrder = 10 + (i - 1) * 20 -- More spacing for extra controls
+
+			local loadout = ShamanPower_TotemLoadouts[idx]
+			local lname = loadout and (loadout.name or ("Loadout " .. idx)) or ("Loadout " .. idx)
+
+			-- Header with name and active indicator
+			loadoutArgs["lo_header_" .. idx] = {
+				order = baseOrder,
+				type = "description",
+				name = function()
+					local lo = ShamanPower_TotemLoadouts[idx]
+					if not lo then return "" end
+					local n = lo.name or ("Loadout " .. idx)
+					local active = (ShamanPower.opt.activeLoadout == idx) and "  |cff00ff00[Active]|r" or ""
+					return "\n|cffffd200" .. idx .. ". " .. n .. "|r" .. active
+				end,
+				fontSize = "medium",
+			}
+
+			-- Color-coded description
+			loadoutArgs["lo_desc_" .. idx] = {
+				order = baseOrder + 1,
+				type = "description",
+				name = function()
+					return ShamanPower:GetLoadoutDescription(idx) .. "\n"
+				end,
+			}
+
+			-- Rename input (same layout as TotemTimers: Rename | Icon | Update | Delete)
+			loadoutArgs["lo_rename_" .. idx] = {
+				order = baseOrder + 2,
+				type = "input",
+				name = "Rename",
+				width = 0.9,
+				get = function(info)
+					local lo = ShamanPower_TotemLoadouts[idx]
+					return lo and lo.name or ""
+				end,
+				set = function(info, val)
+					if val and val:trim() == "" then val = nil end
+					ShamanPower:RenameLoadout(idx, val)
+					RefreshLoadoutArgs()
+					ShamanPower:RefreshConfig()
+				end,
+			}
+
+			-- Icon picker button (same as TotemTimers GUI/Sets.lua setIcon)
+			loadoutArgs["lo_icon_" .. idx] = {
+				order = baseOrder + 2.5,
+				type = "execute",
+				name = function()
+					local lo = ShamanPower_TotemLoadouts[idx]
+					if not lo then return "Icon" end
+					local icon = lo.icon or ShamanPower:GetLoadoutIcon(idx)
+					return "|T" .. icon .. ":16|t Icon"
+				end,
+				desc = "Click to choose an icon for this loadout",
+				width = 0.5,
+				func = function()
+					if not ShamanPower_TotemLoadouts[idx] then return end
+					local loadoutIndex = idx
+					ShamanPower:OpenIconPicker(loadoutIndex, function(selectedIcon)
+						if not ShamanPower_TotemLoadouts[loadoutIndex] then return end
+						ShamanPower_TotemLoadouts[loadoutIndex].icon = selectedIcon
+						ShamanPower:UpdateLoadoutBar()
+						RefreshLoadoutArgs()
+						ShamanPower:RefreshConfig()
+					end)
+				end,
+			}
+
+			loadoutArgs["lo_delete_" .. idx] = {
+				order = baseOrder + 3,
+				type = "execute",
+				name = "Delete",
+				width = 0.5,
+				func = function()
+					if not ShamanPower_TotemLoadouts[idx] then return end
+					local popup = StaticPopup_Show("SHAMANPOWER_DELETESET", lname)
+					if popup then popup.data = idx end
+				end,
+			}
+
+			-- Per-element totem dropdowns (pick totems individually)
+			loadoutArgs["lo_totems_header_" .. idx] = {
+				order = baseOrder + 4,
+				type = "description",
+				name = "    |cff888888Edit totems:|r",
+			}
+
+			for element = 1, 4 do
+				local elem = element
+				loadoutArgs["lo_totem_" .. idx .. "_" .. elem] = {
+					order = baseOrder + 4 + elem,
+					type = "select",
+					name = loadoutElementNames[elem],
+					width = 0.75,
+					values = GetTotemValues(elem),
+					sorting = GetTotemSorting(elem),
+					get = function(info)
+						local lo = ShamanPower_TotemLoadouts[idx]
+						return lo and lo[elem] or 0
+					end,
+					set = function(info, val)
+						ShamanPower:SetLoadoutTotem(idx, elem, val)
+						ShamanPower:RefreshConfig()
+					end,
+				}
+			end
+		end
+	end
+end
+
+-- Initialize once (ShamanPower_TotemLoadouts won't exist yet at file load, so just build static part)
+RefreshLoadoutArgs()
+
+-- Expose so ShamanPower.lua can call it after SavedVariables are loaded
+function ShamanPower:RefreshLoadoutArgs()
+	RefreshLoadoutArgs()
+end
+
 -------------------------------------------------------------------
 -- AceConfig
 -------------------------------------------------------------------
@@ -107,22 +716,6 @@ ShamanPower.options = {
 								ShamanPower:UpdateRoster()
 							end
 						},
-						synctotemtimers = {
-							order = 6,
-							name = "Sync to TotemTimers",
-							desc = "When enabled, changing totem assignments will automatically update TotemTimers bar (requires TotemTimers addon)",
-							type = "toggle",
-							width = 1.0,
-							disabled = function(info)
-								return ShamanPower.opt.enabled == false
-							end,
-							get = function(info)
-								return ShamanPower.opt.syncToTotemTimers
-							end,
-							set = function(info, val)
-								ShamanPower.opt.syncToTotemTimers = val
-							end
-						},
 						reportchannel = {
 							order = 7,
 							type = "select",
@@ -226,7 +819,7 @@ ShamanPower.options = {
 						enableTwisting = {
 							order = 6,
 							name = "Enable Totem Twisting",
-							desc = "Enable Air totem twisting (alternates between Windfury and Grace of Air). This is the same option as the checkbox in /sp totems.",
+							desc = function(info) return "Enable Air totem twisting (alternates between Windfury and " .. ShamanPower:GetTwistTotemName() .. "). This is the same option as the checkbox in /sp totems." end,
 							type = "toggle",
 							width = "full",
 							disabled = function(info)
@@ -250,6 +843,38 @@ ShamanPower.options = {
 								else
 									ShamanPower:HideTwistTimer()
 								end
+							end
+						},
+						twistTotemSelect = {
+							order = 6.5,
+							name = "Twist Totem",
+							desc = "Select which Air totem to alternate with Windfury when twisting",
+							type = "select",
+							width = 1.0,
+							hidden = function(info)
+								return not ShamanPower.opt.enableTotemTwisting
+							end,
+							disabled = function(info)
+								return ShamanPower.opt.enabled == false
+							end,
+							values = function()
+								local vals = {}
+								-- 2=Grace of Air, 3=Wrath of Air, 4=Tranquil Air, 6=Nature Resistance
+								for _, i in ipairs({2, 3, 4, 6}) do
+									local name = GetSpellInfo(ShamanPower.AirTotems[i])
+									if name then
+										vals[i] = name
+									end
+								end
+								return vals
+							end,
+							get = function(info)
+								return ShamanPower.opt.twistTotem or 2
+							end,
+							set = function(info, val)
+								ShamanPower.opt.twistTotem = val
+								ShamanPower:UpdateMiniTotemBar()
+								ShamanPower:UpdateSPMacros()
 							end
 						},
 						twistTimerNoDecimals = {
@@ -845,6 +1470,15 @@ ShamanPower.options = {
 							end
 						}
 					}
+				},
+				loadouts_section = {
+					order = 3.7,
+					name = "Totem Loadouts",
+					type = "group",
+					disabled = function(info)
+						return ShamanPower.opt.enabled == false or not isShaman
+					end,
+					args = loadoutArgs,
 				},
 				cp_button = {
 					order = 4,
@@ -5549,6 +6183,112 @@ ShamanPower.options = {
 								ShamanPower.opt.totemPlates.pulseBarHeight = val
 								ShamanPower:UpdateTotemPlatesPulseSettings()
 							end
+						},
+					}
+				},
+				loadoutbar_section = {
+					order = 11,
+					name = "Loadout Bar",
+					type = "group",
+					disabled = function(info)
+						return ShamanPower.opt.enabled == false or not isShaman
+					end,
+					args = {
+						loadoutbar_desc = {
+							order = 0,
+							type = "description",
+							name = "Customize the appearance of the on-screen totem loadout bar.\n",
+						},
+						loadoutbar_scale = {
+							order = 1,
+							name = "Scale",
+							desc = "Adjust the size of the loadout bar",
+							type = "range",
+							width = 1.5,
+							min = 0.5,
+							max = 2.0,
+							step = 0.05,
+							disabled = function()
+								return ShamanPower.opt.enabled == false or not isShaman or not ShamanPower.opt.showLoadoutBar
+							end,
+							get = function(info)
+								return ShamanPower.opt.loadoutBarScale or 1.0
+							end,
+							set = function(info, val)
+								ShamanPower.opt.loadoutBarScale = val
+								ShamanPower:UpdateLoadoutBar()
+							end,
+						},
+						loadoutbar_opacity = {
+							order = 2,
+							name = "Opacity",
+							desc = "Adjust the opacity/transparency of the loadout bar",
+							type = "range",
+							width = 1.5,
+							min = 0.1,
+							max = 1.0,
+							step = 0.05,
+							isPercent = true,
+							disabled = function()
+								return ShamanPower.opt.enabled == false or not isShaman or not ShamanPower.opt.showLoadoutBar
+							end,
+							get = function(info)
+								return ShamanPower.opt.loadoutBarOpacity or 1.0
+							end,
+							set = function(info, val)
+								ShamanPower.opt.loadoutBarOpacity = val
+								ShamanPower:UpdateLoadoutBar()
+							end,
+						},
+						loadoutbar_locked = {
+							order = 3,
+							name = "Lock Position",
+							desc = "Prevent the loadout bar from being moved (ALT+Drag is disabled when locked)",
+							type = "toggle",
+							width = "full",
+							disabled = function()
+								return ShamanPower.opt.enabled == false or not isShaman or not ShamanPower.opt.showLoadoutBar
+							end,
+							get = function(info)
+								return ShamanPower.opt.loadoutBarLocked
+							end,
+							set = function(info, val)
+								ShamanPower.opt.loadoutBarLocked = val
+							end,
+						},
+						loadoutbar_hidenames = {
+							order = 4,
+							name = "Hide Loadout Names",
+							desc = "Hide the name labels shown next to loadout buttons",
+							type = "toggle",
+							width = "full",
+							disabled = function()
+								return ShamanPower.opt.enabled == false or not isShaman or not ShamanPower.opt.showLoadoutBar
+							end,
+							get = function(info)
+								return ShamanPower.opt.loadoutBarHideNames
+							end,
+							set = function(info, val)
+								ShamanPower.opt.loadoutBarHideNames = val
+								ShamanPower:UpdateLoadoutBar()
+							end,
+						},
+						loadoutbar_showtotems = {
+							order = 5,
+							name = "Show Totem Icons on Active Loadout",
+							desc = "Show the 4 totem icons on the active loadout button instead of the loadout icon, so you can see at a glance which totems are assigned",
+							type = "toggle",
+							width = "full",
+							disabled = function()
+								return ShamanPower.opt.enabled == false or not isShaman or not ShamanPower.opt.showLoadoutBar
+							end,
+							get = function(info)
+								return ShamanPower.opt.loadoutBarShowTotems
+							end,
+							set = function(info, val)
+								ShamanPower.opt.loadoutBarShowTotems = val
+								ShamanPower:UpdateLoadoutBar()
+							end,
 						},
 					}
 				},

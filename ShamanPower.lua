@@ -304,7 +304,17 @@ function ShamanPower:OnInitialize()
 		LibStub("AceConfigDialog-3.0"):Open("ShamanPower", ConfigFrame)
 		ConfigFrame:Hide()
 		_G["ShamanPowerConfigFrame"] = ConfigFrame.frame
+		self.configWidget = ConfigFrame
 		table.insert(UISpecialFrames, "ShamanPowerConfigFrame")
+	end
+
+	self.RefreshConfig = function(self)
+		if self.configWidget then
+			LibStub("AceConfigDialog-3.0"):Open("ShamanPower", self.configWidget)
+			-- Hook the "Loadout Name" editbox so typing updates _newLoadoutName live
+			-- (AceConfig inputs only fire set on Enter press)
+			self:HookLoadoutNameEditBox(self.configWidget)
+		end
 	end
 
 	self.MinimapIcon = LibStub("LibDBIcon-1.0")
@@ -369,6 +379,14 @@ function ShamanPower:OnInitialize()
 		ShamanPower_SavedPresets["ShamanPower_Assignments"] = {[0] = {}}
 		ShamanPower_SavedPresets["ShamanPower_NormalAssignments"] = {[0] = {}}
 		ShamanPower_SavedPresets["ShamanPower_AuraAssignments"] = {[0] = {}}
+	end
+
+	if not ShamanPower_TotemLoadouts then
+		ShamanPower_TotemLoadouts = {}
+	end
+	-- Rebuild loadout options now that SavedVariables are loaded
+	if self.RefreshLoadoutArgs then
+		self:RefreshLoadoutArgs()
 	end
 
 	-- Initialize assignment tables if they don't exist
@@ -499,6 +517,10 @@ function ShamanPower:OnEnable()
 	end
 	self:BindKeys()
 	self:UpdateRoster()
+	if isShaman then
+		self:CreateLoadoutBar()
+		self:UpdateLoadoutBar()
+	end
 end
 
 -- Called when combat ends - reset Drop All castsequence
@@ -510,6 +532,11 @@ function ShamanPower:OnCombatEnd()
 	if self.cdbarVisibilityPending then
 		self.cdbarVisibilityPending = false
 		self:UpdateCooldownBar()
+	end
+	-- Deferred loadout bar update if blocked during combat
+	if self.pendingLoadoutBarUpdate then
+		self.pendingLoadoutBarUpdate = false
+		self:UpdateLoadoutBar()
 	end
 end
 
@@ -1228,6 +1255,11 @@ function ShamanPowerBlessingsGrid_Update(self, elapsed)
 					ShamanPower.opt.enableTotemTwisting = enabled
 					ShamanPower:UpdateMiniTotemBar()
 					ShamanPower:UpdateSPMacros()
+					-- Show/hide the twist totem dropdown
+					local twistDrop = _G[frameName .. "TwistDrop"]
+					if twistDrop then
+						if enabled then twistDrop:Show() else twistDrop:Hide() end
+					end
 					-- Refresh Options panel if it's open
 					LibStub("AceConfigRegistry-3.0"):NotifyChange("ShamanPower")
 					if enabled then
@@ -1241,7 +1273,7 @@ function ShamanPowerBlessingsGrid_Update(self, elapsed)
 				if ShamanPower.opt.ShowTooltips then
 					GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
 					GameTooltip:SetText("Totem Twisting")
-					GameTooltip:AddLine("Enable Air totem twisting (Windfury + Grace of Air)", 1, 1, 1, true)
+					GameTooltip:AddLine("Enable Air totem twisting (Windfury + " .. ShamanPower:GetTwistTotemName() .. ")", 1, 1, 1, true)
 					GameTooltip:Show()
 				end
 			end)
@@ -1250,6 +1282,58 @@ function ShamanPowerBlessingsGrid_Update(self, elapsed)
 			local twistEnabled = ShamanPower_TwistAssignments[name] or false
 			twistCheck:SetChecked(twistEnabled)
 			twistCheck:Show()
+
+			-- Create or update Twist Totem dropdown (only for local player)
+			if name == self.player then
+				local twistDrop = _G[fname .. "TwistDrop"]
+				if not twistDrop then
+					twistDrop = CreateFrame("Button", fname .. "TwistDrop", playerFrame)
+					twistDrop:SetSize(110, 18)
+					twistDrop:SetPoint("LEFT", twistCheck.text, "RIGHT", 8, 0)
+
+					twistDrop.bg = twistDrop:CreateTexture(nil, "BACKGROUND")
+					twistDrop.bg:SetAllPoints()
+					twistDrop.bg:SetColorTexture(0.15, 0.15, 0.15, 0.8)
+
+					twistDrop.text = twistDrop:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+					twistDrop.text:SetPoint("LEFT", 4, 0)
+					twistDrop.text:SetPoint("RIGHT", -12, 0)
+					twistDrop.text:SetJustifyH("LEFT")
+
+					twistDrop.arrow = twistDrop:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+					twistDrop.arrow:SetPoint("RIGHT", -2, 0)
+					twistDrop.arrow:SetText("v")
+
+					twistDrop:SetScript("OnClick", function(btn)
+						local menu = {}
+						-- 2=Grace of Air, 3=Wrath of Air, 4=Tranquil Air, 6=Nature Resistance
+						for _, i in ipairs({2, 3, 4, 6}) do
+							local spellName = GetSpellInfo(ShamanPower.AirTotems[i])
+							if spellName then
+								tinsert(menu, {
+									text = spellName,
+									checked = (ShamanPower.opt.twistTotem or 2) == i,
+									func = function()
+										ShamanPower.opt.twistTotem = i
+										btn.text:SetText(spellName)
+										ShamanPower:UpdateMiniTotemBar()
+										ShamanPower:UpdateSPMacros()
+										LibStub("AceConfigRegistry-3.0"):NotifyChange("ShamanPower")
+										LUIDDM:CloseDropDownMenus()
+									end
+								})
+							end
+						end
+						LUIDDM:EasyMenu(menu, ShamanPower.menuFrame, btn, 0, 0, "MENU")
+					end)
+				end
+				twistDrop.text:SetText(self:GetTwistTotemName())
+				if twistEnabled then
+					twistDrop:Show()
+				else
+					twistDrop:Hide()
+				end
+			end
 
 			-- Hide cooldown icons (CIcon1-2, CSkill1-2)
 			for id = 1, 2 do
@@ -1472,91 +1556,6 @@ function ShamanPower:Report(type, chanNum)
 		elseif not IsInRaid() then
 			self:Print(ERR_NOT_IN_RAID)
 		end
-	end
-end
-
--- ============================================================================
--- TotemTimers Integration (Optional)
--- Syncs ShamanPower totem assignments to TotemTimers bar
--- Only enabled when TotemTimers is installed AND the option is enabled
--- ============================================================================
-
--- Map ShamanPower element IDs to TotemTimers element slots
--- ShamanPower: 1=Earth, 2=Fire, 3=Water, 4=Air
--- TotemTimers: EARTH_TOTEM_SLOT=2, FIRE_TOTEM_SLOT=1, WATER_TOTEM_SLOT=3, AIR_TOTEM_SLOT=4
-local ShamanPower_ToTotemTimers_ElementMap = {
-	[1] = 2,  -- Earth -> EARTH_TOTEM_SLOT (2)
-	[2] = 1,  -- Fire -> FIRE_TOTEM_SLOT (1)
-	[3] = 3,  -- Water -> WATER_TOTEM_SLOT (3)
-	[4] = 4,  -- Air -> AIR_TOTEM_SLOT (4)
-}
-
--- Check if TotemTimers integration is available and enabled
-function ShamanPower:IsTotemTimersSyncEnabled()
-	-- Check if TotemTimers addon is loaded
-	if not TotemTimers or not XiTimers or not XiTimers.timers then
-		return false
-	end
-	-- Check if the sync option is enabled in settings (default to true if TotemTimers is present)
-	if self.db and self.db.profile and self.db.profile.syncToTotemTimers ~= nil then
-		return self.db.profile.syncToTotemTimers
-	end
-	-- Default to true if TotemTimers is available
-	return true
-end
-
-function ShamanPower:SyncToTotemTimers(element, totemIndex)
-	-- Check if sync is enabled
-	if not self:IsTotemTimersSyncEnabled() then
-		return
-	end
-
-	-- Skip if element is invalid (e.g., shift-click mass assign uses element 5)
-	if element < 1 or element > 4 then
-		return
-	end
-
-	-- Get the spell ID for this totem assignment
-	local spellID = nil
-	if totemIndex and totemIndex > 0 then
-		spellID = self:GetTotemSpell(element, totemIndex)
-	end
-
-	if not spellID then
-		return  -- No totem assigned, don't change TotemTimers
-	end
-
-	-- Map to TotemTimers element slot
-	local ttSlot = ShamanPower_ToTotemTimers_ElementMap[element]
-	if not ttSlot then
-		return
-	end
-
-	-- Find the timer with matching .nr slot
-	local timer = nil
-	for i = 1, 4 do
-		if XiTimers.timers[i] and XiTimers.timers[i].nr == ttSlot then
-			timer = XiTimers.timers[i]
-			break
-		end
-	end
-
-	if not timer or not timer.button then
-		return
-	end
-
-	-- Update the TotemTimers button with this spell
-	-- Only if not in combat (secure action buttons can't be modified in combat)
-	if InCombatLockdown() then
-		-- Queue the update for after combat
-		self:RegisterEvent("PLAYER_REGEN_ENABLED", function()
-			self:UnregisterEvent("PLAYER_REGEN_ENABLED")
-			if timer.button then
-				timer.button:SetAttribute("*spell1", spellID)
-			end
-		end)
-	else
-		timer.button:SetAttribute("*spell1", spellID)
 	end
 end
 
@@ -2389,6 +2388,32 @@ function ShamanPower:UpdatePulseGlow(element, totemData, startTime)
 end
 
 -- ============================================================================
+-- Totem Twisting Helpers
+-- ============================================================================
+
+-- Hardcoded icon paths for twist totem options (avoids GetSpellInfo flicker in per-frame updates)
+ShamanPower.TwistTotemIcons = {
+	[2] = "Interface\\Icons\\Spell_Nature_InvisibilityTotem",     -- Grace of Air
+	[3] = "Interface\\Icons\\Spell_Nature_SlowingTotem",          -- Wrath of Air
+	[4] = "Interface\\Icons\\Spell_Nature_Brilliance",            -- Tranquil Air
+	[6] = "Interface\\Icons\\Spell_Nature_NatureResistanceTotem", -- Nature Resistance
+}
+
+function ShamanPower:GetTwistTotemName()
+	local idx = self.opt.twistTotem or 2
+	local spellID = self.AirTotems[idx]
+	if spellID then
+		return GetSpellInfo(spellID) or "Grace of Air Totem"
+	end
+	return "Grace of Air Totem"
+end
+
+function ShamanPower:GetTwistTotemIcon()
+	local idx = self.opt.twistTotem or 2
+	return self.TwistTotemIcons[idx] or "Interface\\Icons\\Spell_Nature_InvisibilityTotem"
+end
+
+-- ============================================================================
 -- Totem Twisting Timer (visual countdown for Air totem twist window)
 -- ============================================================================
 
@@ -2448,11 +2473,12 @@ function ShamanPower:UpdateTwistTimer()
 		local iconTexture = airButton and airButton.icon
 		if iconTexture then
 			if haveTotem and name then
+				local twistName = self:GetTwistTotemName()
 				if name:find("Windfury") then
-					-- WF is down, show GoA icon (what to cast next)
-					iconTexture:SetTexture("Interface\\Icons\\Spell_Nature_InvisibilityTotem")
-				elseif name:find("Grace") then
-					-- GoA is down, show WF icon (what to cast next)
+					-- WF is down, show twist totem icon (what to cast next)
+					iconTexture:SetTexture(self:GetTwistTotemIcon())
+				elseif name:find(twistName, 1, true) then
+					-- Twist totem is down, show WF icon (what to cast next)
 					iconTexture:SetTexture("Interface\\Icons\\Spell_Nature_Windfury")
 				end
 				-- Don't change icon for other Air totems - let them show naturally
@@ -3412,8 +3438,9 @@ function ShamanPower:UpdateActiveTotemOverlays()
 					-- Any Air totem matches - the main icon will show whatever is active
 					matches = true
 				elseif element == 4 and self.opt and self.opt.enableTotemTwisting then
-					-- Classic mode: only Windfury/Grace of Air match for twisting
-					if totemName:find("Windfury") or totemName:find("Grace of Air") then
+					-- Classic mode: Windfury or selected twist totem match
+					local twistName = self:GetTwistTotemName()
+					if totemName:find("Windfury") or totemName:find(twistName, 1, true) then
 						matches = true
 					end
 				end
@@ -3525,30 +3552,14 @@ function ShamanPower:UpdateActiveTotemOverlays()
 				if useActiveAsMain and totemButton and iconTexture then
 					-- Special case: Air totem with twisting - show the currently active totem icon
 					if element == 4 and self.opt.enableTotemTwisting and haveTotem and totemName then
-						-- Find the icon for the active totem by searching through known totems
-						local activeTotemIcon = nil
-						local totems = self.Totems[element]
-						if totems then
-							for idx, totemSpellID in pairs(totems) do
-								if totemSpellID and type(totemSpellID) == "number" then
-									local totemSpellName = GetSpellInfo(totemSpellID)
-									if totemSpellName then
-										local ok, found = pcall(string.find, totemName, totemSpellName, 1, true)
-										if ok and found then
-											activeTotemIcon = self:GetTotemIcon(element, idx)
-											break
-										end
-									end
-								end
+						-- Use hardcoded icons to avoid flicker from per-frame GetSpellInfo calls
+						if totemName:find("Windfury") then
+							iconTexture:SetTexture("Interface\\Icons\\Spell_Nature_Windfury")
+						else
+							local twistName = self:GetTwistTotemName()
+							if totemName:find(twistName, 1, true) then
+								iconTexture:SetTexture(self:GetTwistTotemIcon())
 							end
-						end
-						-- Fallback: try GetSpellInfo directly
-						if not activeTotemIcon then
-							local _, _, icon = GetSpellInfo(totemName)
-							activeTotemIcon = icon
-						end
-						if activeTotemIcon then
-							iconTexture:SetTexture(activeTotemIcon)
 						end
 					else
 						-- Normal case: show assigned totem icon
@@ -5105,7 +5116,8 @@ function ShamanPower:UpdateTotemButtons()
 			end
 
 			-- Always update icon (even for popped out elements)
-			if btn.icon then
+			-- Skip Air icon when twisting - the twist timer manages it to avoid flicker
+			if btn.icon and not (element == 4 and self.opt.enableTotemTwisting) then
 				btn.icon:SetTexture(icon)
 			end
 
@@ -5120,9 +5132,13 @@ function ShamanPower:UpdateTotemButtons()
 			-- Set up spell casting (same logic as XML buttons)
 			if element == 4 and self.opt.enableTotemTwisting then
 				local wfName = GetSpellInfo(25587) or "Windfury Totem"
-				local goaName = GetSpellInfo(25359) or "Grace of Air Totem"
+				local twistName = self:GetTwistTotemName()
 				btn:SetAttribute("type1", "macro")
-				btn:SetAttribute("macrotext1", "/castsequence reset=combat/15 " .. wfName .. ", " .. goaName)
+				btn:SetAttribute("macrotext1", "/castsequence reset=combat/15 " .. wfName .. ", " .. twistName)
+				-- Set initial twist icon (Windfury) if icon hasn't been set yet by twist timer
+				if btn.icon then
+					btn.icon:SetTexture("Interface\\Icons\\Spell_Nature_Windfury")
+				end
 			elseif spellName then
 				btn:SetAttribute("type1", "spell")
 				btn:SetAttribute("spell1", spellName)
@@ -5450,7 +5466,6 @@ function ShamanPower:CreateTotemFlyout(element)
 						ShamanPower:UpdateMiniTotemBar()
 						ShamanPower:UpdateDropAllButton()
 						ShamanPower:UpdateSPMacros()
-						ShamanPower:SyncToTotemTimers(elem, totemIdx)
 						ShamanPower:SendMessage("ASSIGN " .. ShamanPower.player .. " " .. elem .. " " .. totemIdx)
 						-- Update flyout visibility to mark the new assignment correctly
 						ShamanPower:UpdateFlyoutVisibility(elem)
@@ -6854,6 +6869,7 @@ end
 function ShamanPower:UpdateCooldownBarLayout()
 	if not self.cooldownBar then return end
 	if #self.cooldownButtons == 0 then return end
+	if InCombatLockdown() then return end
 
 	-- Sort cooldownButtons by cooldownBarOrder
 	local cooldownBarOrder = self.opt.cooldownBarOrder or {1, 2, 3, 4, 5, 6, 7}
@@ -9201,9 +9217,9 @@ function ShamanPower:UpdateMiniTotemBar()
 				if element == 4 and self.opt.enableTotemTwisting then
 					-- Air totem with twisting: use castsequence macro
 					local wfName = GetSpellInfo(25587) or "Windfury Totem"
-					local goaName = GetSpellInfo(25359) or "Grace of Air Totem"
+					local twistName = self:GetTwistTotemName()
 					totemButton:SetAttribute("type1", "macro")
-					totemButton:SetAttribute("macrotext1", "/castsequence reset=combat/15 " .. wfName .. ", " .. goaName)
+					totemButton:SetAttribute("macrotext1", "/castsequence reset=combat/15 " .. wfName .. ", " .. twistName)
 					-- Update icon to Windfury
 					local twistIcon = _G["ShamanPowerAutoTotem" .. element .. "Icon"]
 					if twistIcon then
@@ -11065,12 +11081,6 @@ function ShamanPower:PerformCycle(name, class, skipzero)
 		for testC = 1, SHAMANPOWER_MAXCLASSES do
 			ShamanPower_Assignments[name][testC] = cur
 		end
-		-- Sync all elements to TotemTimers if this is the current player
-		if name == self.player then
-			for testC = 1, 4 do
-				self:SyncToTotemTimers(testC, cur)
-			end
-		end
 		local msgQueue
 		msgQueue =
 			C_Timer.NewTimer(
@@ -11083,9 +11093,7 @@ function ShamanPower:PerformCycle(name, class, skipzero)
 		)
 	else
 		ShamanPower_Assignments[name][class] = cur
-		-- Sync to TotemTimers if this is the current player's assignment
 		if name == self.player and class >= 1 and class <= 4 then
-			self:SyncToTotemTimers(class, cur)
 			-- Also update the mini totem bar
 			self:UpdateMiniTotemBar()
 			self:UpdateDropAllButton()
@@ -11141,12 +11149,6 @@ function ShamanPower:PerformCycleBackwards(name, class, skipzero)
 		for testC = 1, SHAMANPOWER_MAXCLASSES do
 			ShamanPower_Assignments[name][testC] = cur
 		end
-		-- Sync all elements to TotemTimers if this is the current player
-		if name == self.player then
-			for testC = 1, 4 do
-				self:SyncToTotemTimers(testC, cur)
-			end
-		end
 		local msgQueue
 		msgQueue =
 			C_Timer.NewTimer(
@@ -11159,9 +11161,7 @@ function ShamanPower:PerformCycleBackwards(name, class, skipzero)
 		)
 	else
 		ShamanPower_Assignments[name][class] = cur
-		-- Sync to TotemTimers if this is the current player's assignment
 		if name == self.player and class >= 1 and class <= 4 then
-			self:SyncToTotemTimers(class, cur)
 			-- Also update the mini totem bar
 			self:UpdateMiniTotemBar()
 			self:UpdateDropAllButton()
@@ -11617,16 +11617,16 @@ end
 
 function ShamanPower:SendMessage(msg, type, target)
 	if GetNumGroupMembers() > 0 then
-		if lastMsg ~= msg then
-			lastMsg = msg
-			local type
-			if type == nil then
+		-- Dedup key includes target so broadcast vs whisper of the same msg are distinct
+		local dedupKey = target and (msg .. "\001" .. target) or msg
+		if lastMsg ~= dedupKey then
+			lastMsg = dedupKey
+			if not type then
 				if IsInGroup(LE_PARTY_CATEGORY_INSTANCE) and IsInInstance() then
 					type = "INSTANCE_CHAT"
 				else
 					if IsInRaid() then
 						type = "RAID"
-					--elseif IsInGroup(LE_PARTY_CATEGORY_HOME) then
 					else
 						type = "PARTY"
 					end
@@ -12830,10 +12830,8 @@ function ShamanPower:UpdateLayout()
 	-- Show mini totem bar only if:
 	-- 1. Is a shaman, addon enabled, autobutton option on
 	-- 2. In party/raid or solo (based on settings)
-	-- 3. TotemTimers sync is NOT enabled (if TT sync is on, user uses TT bar instead)
 	local showMiniBar = isShaman and self.opt.enabled and self.opt.autobuff.autobutton
 		and ((GetNumGroupMembers() == 0 and self.opt.ShowWhenSolo) or (GetNumGroupMembers() > 0 and self.opt.ShowInParty))
-		and not self:IsTotemTimersSyncEnabled()
 	if showMiniBar then
 		autob:Show()
 		-- Update the mini totem bar icons and spells
@@ -15166,8 +15164,8 @@ function ShamanPower:UpdateSPMacros()
 		-- Special handling for Air totem when twisting is enabled
 		if element == 4 and self.opt.enableTotemTwisting then
 			local wfName = GetSpellInfo(25587) or "Windfury Totem"  -- Windfury Totem
-			local goaName = GetSpellInfo(25359) or "Grace of Air Totem"  -- Grace of Air Totem
-			body = "#showtooltip\n/castsequence reset=combat/15 " .. wfName .. ", " .. goaName
+			local twistName = self:GetTwistTotemName()
+			body = "#showtooltip\n/castsequence reset=combat/15 " .. wfName .. ", " .. twistName
 		elseif totemIndex > 0 then
 			local spellID = self:GetTotemSpell(element, totemIndex)
 			if spellID then
@@ -15877,7 +15875,6 @@ keybindEventFrame:SetScript("OnEvent", function(self, event, arg1)
 				ShamanPower:UpdateMiniTotemBar()
 				ShamanPower:UpdateDropAllButton()
 				ShamanPower:UpdateSPMacros()
-				ShamanPower:SyncToTotemTimers(elem, totemIdx)
 				ShamanPower:SendMessage("ASSIGN " .. ShamanPower.player .. " " .. elem .. " " .. totemIdx)
 				ShamanPower:UpdateFlyoutVisibility(elem)
 			end
@@ -16264,4 +16261,736 @@ SlashCmdList["SPCENTER"] = function(msg)
 	ShamanPower:UpdateRoster()
 
 	print("|cff00ff00ShamanPower:|r Frames reset to center. Use ALT+drag to reposition.")
+end
+
+-- ============================================================================
+-- TOTEM LOADOUTS: Save/load personal 4-element totem assignments
+-- ============================================================================
+
+function ShamanPower:SaveLoadout(name)
+	if #ShamanPower_TotemLoadouts >= 8 then
+		print("|cffff0000ShamanPower:|r Maximum of 8 loadouts reached.")
+		return
+	end
+	local assignments = ShamanPower_Assignments[self.player]
+	if not assignments then return end
+	local loadout = { name = name or nil }
+	for element = 1, 4 do
+		loadout[element] = assignments[element] or 0
+	end
+	tinsert(ShamanPower_TotemLoadouts, loadout)
+	-- Auto-enable the bar when first loadout is saved
+	if #ShamanPower_TotemLoadouts == 1 then
+		self.opt.showLoadoutBar = true
+	end
+	self:UpdateLoadoutBar()
+	print("|cff00ff00ShamanPower:|r Saved loadout '" .. (name or ("Loadout " .. #ShamanPower_TotemLoadouts)) .. "'")
+end
+
+function ShamanPower:CreateLoadout(name, icon, totems)
+	if #ShamanPower_TotemLoadouts >= 8 then
+		print("|cffff0000ShamanPower:|r Maximum of 8 loadouts reached.")
+		return
+	end
+	local loadout = { name = name or nil, icon = icon or nil }
+	for element = 1, 4 do
+		loadout[element] = (totems and totems[element]) or 0
+	end
+	tinsert(ShamanPower_TotemLoadouts, loadout)
+	local newIndex = #ShamanPower_TotemLoadouts
+	if newIndex == 1 then
+		self.opt.showLoadoutBar = true
+	end
+	-- Auto-activate the newly created loadout
+	self:ApplyLoadout(newIndex)
+	print("|cff00ff00ShamanPower:|r Created loadout '" .. (name or ("Loadout " .. newIndex)) .. "'")
+end
+
+function ShamanPower:ApplyLoadout(index)
+	if InCombatLockdown() then
+		print("|cffff0000ShamanPower:|r Cannot change loadout in combat")
+		return
+	end
+	local loadout = ShamanPower_TotemLoadouts[index]
+	if not loadout then return end
+	local assignments = ShamanPower_Assignments[self.player]
+	if not assignments then
+		ShamanPower_Assignments[self.player] = {}
+		assignments = ShamanPower_Assignments[self.player]
+	end
+	for element = 1, 4 do
+		assignments[element] = loadout[element] or 0
+	end
+	self.opt.activeLoadout = index
+	self:UpdateMiniTotemBar()
+	self:UpdateSPMacros()
+	self:UpdateLoadoutBar()
+	-- Broadcast assignments to other ShamanPower clients
+	for element = 1, 4 do
+		self:SendMessage("ASSIGN " .. self.player .. " " .. element .. " " .. (assignments[element] or 0))
+	end
+	local name = loadout.name or ("Loadout " .. index)
+	print("|cff00ff00ShamanPower:|r Activated '" .. name .. "'")
+	LibStub("AceConfigRegistry-3.0"):NotifyChange("ShamanPower")
+end
+
+function ShamanPower:DeleteLoadout(index)
+	if not ShamanPower_TotemLoadouts[index] then return end
+	tremove(ShamanPower_TotemLoadouts, index)
+	if self.opt.activeLoadout == index then
+		self.opt.activeLoadout = nil
+	elseif self.opt.activeLoadout and self.opt.activeLoadout > index then
+		self.opt.activeLoadout = self.opt.activeLoadout - 1
+	end
+	self:UpdateLoadoutBar()
+end
+
+function ShamanPower:UpdateLoadout(index)
+	local loadout = ShamanPower_TotemLoadouts[index]
+	if not loadout then return end
+	local assignments = ShamanPower_Assignments[self.player]
+	if not assignments then return end
+	for element = 1, 4 do
+		loadout[element] = assignments[element] or 0
+	end
+	self:UpdateLoadoutBar()
+end
+
+function ShamanPower:RenameLoadout(index, newName)
+	local loadout = ShamanPower_TotemLoadouts[index]
+	if not loadout then return end
+	loadout.name = newName
+	self:UpdateLoadoutBar()
+end
+
+-- Set a specific totem for an element within a loadout
+function ShamanPower:SetLoadoutTotem(index, element, totemIdx)
+	local loadout = ShamanPower_TotemLoadouts[index]
+	if not loadout then return end
+	loadout[element] = totemIdx
+	self:UpdateLoadoutBar()
+end
+
+-- Set a custom icon for a loadout (nil to clear and use default 4 mini icons)
+function ShamanPower:SetLoadoutIcon(index, iconPath)
+	local loadout = ShamanPower_TotemLoadouts[index]
+	if not loadout then return end
+	loadout.icon = iconPath
+	self:UpdateLoadoutBar()
+end
+
+-- Hook the "Loadout Name" editbox to capture text as user types (no Enter needed)
+function ShamanPower:HookLoadoutNameEditBox(container)
+	local function scanWidgets(widgets)
+		if not widgets then return end
+		for _, widget in ipairs(widgets) do
+			if widget.type == "EditBox" and widget.label
+				and widget.label:GetText() == "Loadout Name" then
+				if widget.editbox and not widget.editbox._spNameHooked then
+					widget.editbox._spNameHooked = true
+					widget.editbox:HookScript("OnTextChanged", function(eb, userInput)
+						if userInput then
+							ShamanPower._newLoadoutName = eb:GetText()
+						end
+					end)
+				end
+				return
+			end
+			-- Recurse into container children
+			if widget.children then
+				scanWidgets(widget.children)
+			end
+		end
+	end
+	if container and container.children then
+		scanWidgets(container.children)
+	end
+end
+
+-- Get the display icon for a loadout (same as TotemTimers.GetLoadoutIcon):
+-- Custom icon > first totem's icon > default shaman icon
+function ShamanPower:GetLoadoutIcon(index)
+	local loadout = ShamanPower_TotemLoadouts[index]
+	if not loadout then return "Interface\\Icons\\ClassIcon_Shaman" end
+	-- Custom icon set by user
+	if loadout.icon then return loadout.icon end
+	-- Fallback: first non-zero totem's icon
+	for element = 1, 4 do
+		local totemIdx = loadout[element] or 0
+		if totemIdx > 0 then
+			return self:GetTotemIcon(element, totemIdx)
+		end
+	end
+	return "Interface\\Icons\\ClassIcon_Shaman"
+end
+
+-- Element color codes for loadout descriptions (matches TotemTimers ElementColors)
+local loadoutElementColors = {
+	[1] = "|cffb3804d",  -- Earth - brown (0.7, 0.5, 0.3)
+	[2] = "|cffff1a1a",  -- Fire - red (1.0, 0.1, 0.1)
+	[3] = "|cff6666ff",  -- Water - blue (0.4, 0.4, 1.0)
+	[4] = "|cffffffff",  -- Air - white (1.0, 1.0, 1.0)
+}
+
+-- Get a description string of the 4 totems in a loadout (color-coded)
+function ShamanPower:GetLoadoutDescription(index)
+	local loadout = ShamanPower_TotemLoadouts[index]
+	if not loadout then return "" end
+	local parts = {}
+	for element = 1, 4 do
+		local totemIdx = loadout[element] or 0
+		local color = loadoutElementColors[element]
+		if totemIdx > 0 then
+			local name = self:GetTotemName(element, totemIdx)
+			tinsert(parts, color .. name .. "|r")
+		else
+			tinsert(parts, color .. "None|r")
+		end
+	end
+	return table.concat(parts, ", ")
+end
+
+-- Get a plain (no color) description string for chat output
+function ShamanPower:GetLoadoutDescriptionPlain(index)
+	local loadout = ShamanPower_TotemLoadouts[index]
+	if not loadout then return "" end
+	local parts = {}
+	local elementNames = {"E", "F", "W", "A"}
+	for element = 1, 4 do
+		local totemIdx = loadout[element] or 0
+		if totemIdx > 0 then
+			local name = self:GetTotemName(element, totemIdx)
+			tinsert(parts, elementNames[element] .. ": " .. name)
+		else
+			tinsert(parts, elementNames[element] .. ": None")
+		end
+	end
+	return table.concat(parts, "  |  ")
+end
+
+-- ============================================================================
+-- LOADOUT BAR: TotemTimers-style set buttons around a movable anchor
+-- ============================================================================
+
+-- Radial button positions around anchor (same as TotemTimers buttonlocations)
+local loadoutButtonLocations = {
+	{"BOTTOM", "TOP"},
+	{"BOTTOMLEFT", "TOPRIGHT"},
+	{"LEFT", "RIGHT"},
+	{"TOPLEFT", "BOTTOMRIGHT"},
+	{"TOP", "BOTTOM"},
+	{"TOPRIGHT", "BOTTOMLEFT"},
+	{"RIGHT", "LEFT"},
+	{"BOTTOMRIGHT", "TOPLEFT"},
+}
+
+-- Element colors for tooltips (matches TotemTimers: Fire, Earth, Water, Air by totem slot)
+-- ShamanPower uses: 1=Earth, 2=Fire, 3=Water, 4=Air
+local loadoutTooltipColors = {
+	[1] = {r = 0.7, g = 0.5, b = 0.3},  -- Earth (brown)
+	[2] = {r = 1.0, g = 0.1, b = 0.1},  -- Fire (red/orange)
+	[3] = {r = 0.4, g = 0.4, b = 1.0},  -- Water (blue)
+	[4] = {r = 1.0, g = 1.0, b = 1.0},  -- Air (white)
+}
+
+-- Delete set confirmation popup (same as TotemTimers)
+StaticPopupDialogs["SHAMANPOWER_DELETESET"] = {
+	text = "Delete totem set %s?",
+	button1 = OKAY,
+	button2 = CANCEL,
+	whileDead = 1,
+	hideOnEscape = 1,
+	timeout = 0,
+	OnAccept = function(self, nr)
+		if not InCombatLockdown() then
+			ShamanPower:DeleteLoadout(nr)
+			if ShamanPower.RefreshLoadoutArgs then
+				ShamanPower:RefreshLoadoutArgs()
+			end
+			ShamanPower:RefreshConfig()
+		end
+	end,
+}
+
+function ShamanPower:CreateLoadoutBar()
+	if self.loadoutBarCreated then return end
+	self.loadoutBarCreated = true
+
+	-- Anchor button: SecureHandlerEnterLeaveTemplate so hover shows flyout in combat
+	-- Same pattern as totem buttons: _onenter shows, _onleave hides
+	local anchor = CreateFrame("Button", "ShamanPowerSetAnchor", UIParent,
+		"SecureHandlerEnterLeaveTemplate, SecureHandlerBaseTemplate")
+	anchor:SetSize(32, 32)
+	anchor:SetPoint("CENTER", UIParent, "CENTER", 0, -200)
+	anchor:SetFrameStrata("MEDIUM")
+	anchor:SetClampedToScreen(true)
+	anchor:SetMovable(true)
+	anchor:EnableMouse(true)
+	anchor:RegisterForDrag("LeftButton")
+	self.loadoutAnchor = anchor
+
+	-- SECURE HANDLER: Show flyout on hover (WORKS IN COMBAT)
+	-- Same pattern as totem button _onenter/_onleave
+	anchor:SetAttribute("_onenter", [[
+		self:ChildUpdate("show", true)
+	]])
+
+	anchor:SetAttribute("_onleave", [[
+		if not self:IsUnderMouse(true) then
+			self:ChildUpdate("show", false)
+		end
+	]])
+
+	-- Anchor normal texture (standard WoW action button look)
+	local normalTex = anchor:CreateTexture(nil, "BORDER")
+	normalTex:SetTexture("Interface\\Buttons\\UI-Quickslot2")
+	normalTex:SetSize(52, 52)
+	normalTex:SetPoint("CENTER", 0, -1)
+	anchor.normalTex = normalTex
+
+	-- Anchor icon (shows class icon by default)
+	local icon = anchor:CreateTexture(nil, "ARTWORK")
+	icon:SetAllPoints()
+	icon:SetTexture("Interface\\Icons\\ClassIcon_Shaman")
+	anchor.icon = icon
+
+	-- Highlight texture
+	local hlTex = anchor:CreateTexture(nil, "HIGHLIGHT")
+	hlTex:SetAllPoints()
+	hlTex:SetTexture("Interface\\Buttons\\ButtonHilight-Square")
+	hlTex:SetBlendMode("ADD")
+
+	-- 4 mini totem icons in corners on anchor (13x13, TotemTimers style)
+	anchor.miniIcons = {}
+	local anchorPositions = {
+		{point = "TOPLEFT", x = 3, y = -3},
+		{point = "TOPRIGHT", x = -3, y = -3},
+		{point = "BOTTOMLEFT", x = 3, y = 3},
+		{point = "BOTTOMRIGHT", x = -3, y = 3},
+	}
+	for e = 1, 4 do
+		local miniIcon = anchor:CreateTexture(nil, "OVERLAY")
+		miniIcon:SetSize(13, 13)
+		miniIcon:SetPoint(anchorPositions[e].point, anchorPositions[e].x, anchorPositions[e].y)
+		miniIcon:SetTexture(self:GetTotemIcon(e, 0))
+		miniIcon:Hide()
+		anchor.miniIcons[e] = miniIcon
+	end
+
+	-- Name label to the right of anchor
+	local anchorName = anchor:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmallOutline")
+	anchorName:SetPoint("LEFT", anchor, "RIGHT", 4, 0)
+	anchorName:SetText("")
+	anchorName:SetJustifyH("LEFT")
+	anchor.nameText = anchorName
+
+	-- Anchor drag (ALT+drag to move)
+	anchor:SetScript("OnDragStart", function(btn)
+		if self.opt.loadoutBarLocked then return end
+		if IsAltKeyDown() then
+			anchor:StartMoving()
+			anchor.isMoving = true
+		end
+	end)
+	anchor:SetScript("OnDragStop", function(btn)
+		if anchor.isMoving then
+			anchor:StopMovingOrSizing()
+			anchor.isMoving = false
+			self:SaveLoadoutBarPosition()
+		end
+	end)
+
+	-- Anchor tooltip (HookScript so secure _onenter/_onleave still fires)
+	anchor:HookScript("OnEnter", function(btn)
+		GameTooltip:SetOwner(btn, "ANCHOR_RIGHT")
+		GameTooltip:AddLine("Totem Sets", 1, 1, 1)
+		if self.opt.activeLoadout and ShamanPower_TotemLoadouts[self.opt.activeLoadout] then
+			local lo = ShamanPower_TotemLoadouts[self.opt.activeLoadout]
+			GameTooltip:AddLine("Active: " .. (lo.name or ("Set " .. self.opt.activeLoadout)), 0.3, 1.0, 0.3)
+		end
+		if not self.opt.loadoutBarLocked then
+			GameTooltip:AddLine("ALT+Drag to move", 0, 0.9, 1)
+		end
+		GameTooltip:Show()
+	end)
+	anchor:HookScript("OnLeave", function(btn)
+		GameTooltip:Hide()
+	end)
+
+	-- Pre-create 8 set buttons as CHILDREN of anchor (required for ChildUpdate to work)
+	self.loadoutButtons = {}
+	for i = 1, 8 do
+		local btn = CreateFrame("Button", "ShamanPowerSetButton" .. i, anchor,
+			"SecureHandlerShowHideTemplate, SecureHandlerEnterLeaveTemplate")
+		btn:SetSize(32, 32)
+		btn:SetClampedToScreen(true)
+		btn:EnableMouse(true)
+		btn:RegisterForClicks("LeftButtonUp")
+		btn:SetFrameStrata("HIGH")
+
+		-- SECURE HANDLER: Hide flyout when mouse leaves set button (if not over parent anchor)
+		-- Same pattern as totem flyout _onleave
+		btn:SetAttribute("_onleave", [[
+			if not self:GetParent():IsUnderMouse(true) then
+				self:GetParent():ChildUpdate("show", false)
+			end
+		]])
+
+		-- SECURE HANDLER: Toggle visibility on parent ChildUpdate("toggle")
+		-- Same as TotemTimers: _childupdate-toggle
+		btn:SetAttribute("_childupdate-toggle", [[
+			if not self:GetAttribute("inactive") then
+				if self:IsVisible() then
+					self:Hide()
+				else
+					self:Show()
+				end
+			end
+		]])
+
+		-- SECURE HANDLER: Show/hide on parent ChildUpdate("show", bool)
+		-- Same as TotemTimers: _childupdate-show
+		btn:SetAttribute("_childupdate-show", [[
+			if message and not self:GetAttribute("inactive") then
+				self:Show()
+			else
+				self:Hide()
+			end
+		]])
+
+		-- Normal texture (standard WoW action button)
+		local btnNormal = btn:CreateTexture(nil, "BORDER")
+		btnNormal:SetTexture("Interface\\Buttons\\UI-Quickslot2")
+		btnNormal:SetSize(52, 52)
+		btnNormal:SetPoint("CENTER", 0, -1)
+		btn.normalTex = btnNormal
+
+		-- Button background icon
+		local btnIcon = btn:CreateTexture(nil, "ARTWORK")
+		btnIcon:SetAllPoints()
+		btnIcon:SetTexture(nil)
+		btn.icon = btnIcon
+
+		-- Highlight
+		local btnHL = btn:CreateTexture(nil, "HIGHLIGHT")
+		btnHL:SetAllPoints()
+		btnHL:SetTexture("Interface\\Buttons\\ButtonHilight-Square")
+		btnHL:SetBlendMode("ADD")
+
+		-- 4 mini totem icons in corners (13x13, same as TotemTimers)
+		btn.miniIcons = {}
+		local positions = {
+			{point = "TOPLEFT", x = 3, y = -3},
+			{point = "TOPRIGHT", x = -3, y = -3},
+			{point = "BOTTOMLEFT", x = 3, y = 3},
+			{point = "BOTTOMRIGHT", x = -3, y = 3},
+		}
+		for e = 1, 4 do
+			local miniIcon = btn:CreateTexture(nil, "OVERLAY")
+			miniIcon:SetSize(13, 13)
+			miniIcon:SetPoint(positions[e].point, positions[e].x, positions[e].y)
+			miniIcon:SetTexture("Interface\\Icons\\INV_Misc_QuestionMark")
+			btn.miniIcons[e] = miniIcon
+		end
+
+		-- Name label to the right of button
+		local nameText = btn:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmallOutline")
+		nameText:SetPoint("LEFT", btn, "RIGHT", 4, 0)
+		nameText:SetText("")
+		nameText:SetJustifyH("LEFT")
+		btn.nameText = nameText
+
+		btn.nr = i
+
+		-- Plain Lua OnClick: apply loadout (blocked in combat)
+		btn:SetScript("OnClick", function(self, button)
+			if button == "LeftButton" then
+				if InCombatLockdown() then
+					print("|cffff0000ShamanPower:|r Cannot change loadout during combat")
+					return
+				end
+				local index = self:GetAttribute("loadoutIndex")
+				ShamanPower:ApplyLoadout(index)
+				-- Close flyout (ApplyLoadout calls UpdateLoadoutBar which reconfigures buttons,
+				-- but doesn't hide the open flyout — do it explicitly)
+				ShamanPower:HideLoadoutMenu()
+			end
+		end)
+
+		-- Tooltip (HookScript so secure _onleave still fires)
+		btn:HookScript("OnEnter", function(self)
+			GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+			local set = ShamanPower_TotemLoadouts[self.nr]
+			if set then
+				GameTooltip:AddLine(set.name or ("Set " .. self.nr), 1, 1, 1)
+				for element = 1, 4 do
+					local totemIdx = set[element] or 0
+					local color = loadoutTooltipColors[element]
+					if totemIdx > 0 then
+						GameTooltip:AddLine(ShamanPower:GetTotemName(element, totemIdx), color.r, color.g, color.b)
+					else
+						GameTooltip:AddLine("None", color.r, color.g, color.b)
+					end
+				end
+				GameTooltip:AddLine(" ")
+			end
+			GameTooltip:AddLine("Left-click to load totem set", 0, 0.9, 1)
+			GameTooltip:Show()
+		end)
+		btn:HookScript("OnLeave", function(self)
+			GameTooltip:Hide()
+		end)
+
+		-- Start hidden and marked inactive (UpdateLoadoutBar will activate populated ones)
+		btn:SetAttribute("inactive", true)
+		btn:Hide()
+		self.loadoutButtons[i] = btn
+	end
+
+	-- Restore position
+	self:RestoreLoadoutBarPosition()
+end
+
+function ShamanPower:UpdateLoadoutBar()
+	if not self.loadoutBarCreated then return end
+	-- Anchor is a secure frame - can't touch it in combat
+	if InCombatLockdown() then
+		self.pendingLoadoutBarUpdate = true
+		return
+	end
+
+	local numLoadouts = #ShamanPower_TotemLoadouts
+
+	-- Show/hide anchor (need loadouts AND setting enabled)
+	if not self.opt.showLoadoutBar or numLoadouts == 0 then
+		if not InCombatLockdown() then
+			self.loadoutAnchor:Hide()
+		end
+		return
+	end
+
+	if not InCombatLockdown() then
+		self.loadoutAnchor:Show()
+	end
+
+	-- Apply scale and opacity
+	local scale = self.opt.loadoutBarScale or 1.0
+	local opacity = self.opt.loadoutBarOpacity or 1.0
+	self.loadoutAnchor:SetScale(scale)
+	self.loadoutAnchor:SetAlpha(opacity)
+
+	-- Update anchor: show active loadout's icon and name
+	local hideNames = self.opt.loadoutBarHideNames
+	local showTotems = self.opt.loadoutBarShowTotems
+	if self.opt.activeLoadout and ShamanPower_TotemLoadouts[self.opt.activeLoadout] then
+		local lo = ShamanPower_TotemLoadouts[self.opt.activeLoadout]
+		self.loadoutAnchor.nameText:SetText(hideNames and "" or (lo.name or ("Set " .. self.opt.activeLoadout)))
+		if showTotems then
+			-- Show 4 mini totem icons with dimmed loadout icon background (like flyout buttons)
+			self.loadoutAnchor.icon:SetTexture(self:GetLoadoutIcon(self.opt.activeLoadout))
+			self.loadoutAnchor.icon:SetAlpha(0.3)
+			for e = 1, 4 do
+				local totemIdx = lo[e] or 0
+				if totemIdx > 0 then
+					self.loadoutAnchor.miniIcons[e]:SetTexture(self:GetTotemIcon(e, totemIdx))
+				else
+					self.loadoutAnchor.miniIcons[e]:SetTexture("Interface\\Icons\\INV_Misc_QuestionMark")
+				end
+				self.loadoutAnchor.miniIcons[e]:Show()
+			end
+		else
+			-- Show loadout icon only
+			self.loadoutAnchor.icon:SetTexture(self:GetLoadoutIcon(self.opt.activeLoadout))
+			self.loadoutAnchor.icon:SetAlpha(1.0)
+			for e = 1, 4 do
+				self.loadoutAnchor.miniIcons[e]:Hide()
+			end
+		end
+	else
+		self.loadoutAnchor.icon:SetTexture("Interface\\Icons\\ClassIcon_Shaman")
+		self.loadoutAnchor.icon:SetAlpha(1.0)
+		self.loadoutAnchor.nameText:SetText("")
+		for e = 1, 4 do
+			self.loadoutAnchor.miniIcons[e]:Hide()
+		end
+	end
+
+	-- Update set buttons: flyout only shows NON-ACTIVE loadouts (anchor is the active one)
+	-- The inactive attribute controls whether the secure _childupdate-toggle shows the button
+	local btnIndex = 0
+	for i = 1, numLoadouts do
+		-- Skip the active loadout (it's shown as the anchor icon)
+		if i ~= self.opt.activeLoadout then
+			btnIndex = btnIndex + 1
+			if btnIndex <= 8 then
+				local btn = self.loadoutButtons[btnIndex]
+				local loadout = ShamanPower_TotemLoadouts[i]
+
+				-- Position radially around anchor (same as TotemTimers)
+				btn:ClearAllPoints()
+				btn:SetPoint(loadoutButtonLocations[btnIndex][1], self.loadoutAnchor, loadoutButtonLocations[btnIndex][2])
+
+				-- Update 4 corner icons with totem textures
+				for element = 1, 4 do
+					local totemIdx = loadout[element] or 0
+					if totemIdx > 0 then
+						btn.miniIcons[element]:SetTexture(self:GetTotemIcon(element, totemIdx))
+					else
+						btn.miniIcons[element]:SetTexture("Interface\\Icons\\INV_Misc_QuestionMark")
+					end
+				end
+
+				-- Show loadout icon as dimmed background (same as TotemTimers: 0.3 alpha)
+				btn.icon:SetTexture(self:GetLoadoutIcon(i))
+				btn.icon:SetAlpha(0.3)
+				btn.nr = i
+				btn:SetAttribute("loadoutIndex", i)
+				btn.nameText:SetText(hideNames and "" or (ShamanPower_TotemLoadouts[i].name or ("Set " .. i)))
+
+				-- Mark as visible in flyout
+				btn:SetAttribute("inactive", false)
+			end
+		end
+	end
+
+	-- Mark remaining buttons as inactive
+	for j = btnIndex + 1, 8 do
+		local btn = self.loadoutButtons[j]
+		btn:SetAttribute("inactive", true)
+		btn.nameText:SetText("")
+		if not InCombatLockdown() then
+			btn:Hide()
+		end
+	end
+end
+
+-- Lua fallback for out-of-combat toggle (used by slash commands etc)
+function ShamanPower:ToggleLoadoutMenu()
+	if InCombatLockdown() then return end
+	for i = 1, 8 do
+		local btn = self.loadoutButtons[i]
+		if not btn:GetAttribute("inactive") then
+			if btn:IsVisible() then
+				btn:Hide()
+			else
+				btn:Show()
+			end
+		end
+	end
+end
+
+function ShamanPower:ShowLoadoutMenu()
+	if InCombatLockdown() then return end
+	local numLoadouts = #ShamanPower_TotemLoadouts
+	for i = 1, 8 do
+		if i <= numLoadouts then
+			self.loadoutButtons[i]:Show()
+		else
+			self.loadoutButtons[i]:Hide()
+		end
+	end
+end
+
+function ShamanPower:HideLoadoutMenu()
+	if InCombatLockdown() then return end
+	for i = 1, 8 do
+		self.loadoutButtons[i]:Hide()
+	end
+end
+
+function ShamanPower:SaveLoadoutBarPosition()
+	local anchor = self.loadoutAnchor
+	if not anchor then return end
+	local point, _, relPoint, x, y = anchor:GetPoint()
+	self.opt.loadoutBarPosition = {point = point, relPoint = relPoint, x = x, y = y}
+end
+
+function ShamanPower:RestoreLoadoutBarPosition()
+	local pos = self.opt.loadoutBarPosition
+	if pos and self.loadoutAnchor then
+		self.loadoutAnchor:ClearAllPoints()
+		self.loadoutAnchor:SetPoint(pos.point or "CENTER", UIParent, pos.relPoint or "CENTER", pos.x or 0, pos.y or -200)
+	end
+end
+
+-- ============================================================================
+-- TOTEM LOADOUT SLASH COMMANDS: /spl
+-- ============================================================================
+
+SLASH_SPLOADOUT1 = "/spl"
+SLASH_SPLOADOUT2 = "/sploadout"
+SlashCmdList["SPLOADOUT"] = function(msg)
+	msg = (msg or ""):trim()
+
+	if msg == "" then
+		print("|cff00ff00ShamanPower Loadouts:|r")
+		print("  /spl save <name>     - Save current totems as new loadout")
+		print("  /spl <number>        - Switch to loadout by index")
+		print("  /spl <name>          - Switch to loadout by name")
+		print("  /spl list            - List all saved loadouts")
+		print("  /spl delete <number> - Delete a loadout by index")
+		return
+	end
+
+	-- /spl list
+	if msg:lower() == "list" then
+		if #ShamanPower_TotemLoadouts == 0 then
+			print("|cff00ff00ShamanPower:|r No loadouts saved. Use /spl save <name> to create one.")
+			return
+		end
+		print("|cff00ff00ShamanPower Loadouts:|r")
+		for i, loadout in ipairs(ShamanPower_TotemLoadouts) do
+			local name = loadout.name or ("Loadout " .. i)
+			local active = (ShamanPower.opt.activeLoadout == i) and " |cff00ff00[Active]|r" or ""
+			local desc = ShamanPower:GetLoadoutDescriptionPlain(i)
+			print("  " .. i .. ". " .. name .. active .. "  -  " .. desc)
+		end
+		return
+	end
+
+	-- /spl save <name>
+	if msg:lower():sub(1, 5) == "save " then
+		local name = msg:sub(6):trim()
+		if name == "" then name = nil end
+		ShamanPower:SaveLoadout(name)
+		return
+	end
+	if msg:lower() == "save" then
+		ShamanPower:SaveLoadout(nil)
+		return
+	end
+
+	-- /spl delete <number>
+	if msg:lower():sub(1, 7) == "delete " then
+		local idx = tonumber(msg:sub(8):trim())
+		if not idx or not ShamanPower_TotemLoadouts[idx] then
+			print("|cffff0000ShamanPower:|r Invalid loadout index.")
+			return
+		end
+		local name = ShamanPower_TotemLoadouts[idx].name or ("Loadout " .. idx)
+		ShamanPower:DeleteLoadout(idx)
+		print("|cff00ff00ShamanPower:|r Deleted loadout '" .. name .. "'")
+		return
+	end
+
+	-- /spl <number> — switch by index
+	local idx = tonumber(msg)
+	if idx then
+		if ShamanPower_TotemLoadouts[idx] then
+			ShamanPower:ApplyLoadout(idx)
+		else
+			print("|cffff0000ShamanPower:|r No loadout at index " .. idx .. ". Use /spl list to see available loadouts.")
+		end
+		return
+	end
+
+	-- /spl <name> — switch by name (case-insensitive)
+	local searchName = msg:lower()
+	for i, loadout in ipairs(ShamanPower_TotemLoadouts) do
+		if loadout.name and loadout.name:lower() == searchName then
+			ShamanPower:ApplyLoadout(i)
+			return
+		end
+	end
+	print("|cffff0000ShamanPower:|r No loadout named '" .. msg .. "'. Use /spl list to see available loadouts.")
 end

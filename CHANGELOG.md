@@ -2,12 +2,23 @@
 
 ## v1.6.0 (2026-02-05)
 
+### New Features
+- **Totem Loadout System**: Save and switch between up to 8 totem loadout presets
+  - Full creation form in Buttons > Totem Loadouts: name your loadout, pick a custom icon, choose 4 totems from dropdowns, and click "Create Loadout"
+  - On-screen loadout bar with hover flyout for quick switching between loadouts
+  - Loadout names displayed next to buttons (toggleable via Look & Feel > Loadout Bar > Hide Loadout Names)
+  - "Show Totem Icons on Active Loadout" option to display the 4 assigned totem icons on the active button
+  - Loadout bar customization: Scale, Opacity, Lock Position (Look & Feel > Loadout Bar)
+  - Per-loadout editing: rename, change icon, swap individual totems, delete
+  - Icon picker panel with scrollable icon grid
+  - Newly created loadouts auto-activate immediately
+  - `/spl save <name>` and `/spl <name>` slash commands for quick save/switch
+- **Windfury Tracker WeakAura support**: Non-shaman party members can now broadcast their Windfury weapon enchant status without installing ShamanPower, enabling class-colored Windfury range dots for all party members. Install the [ShamanPower Windfury Tracker Companion](https://wago.io/otSzIN5ai) WeakAura on non-shaman characters. ShamanPower also listens for the popular WFTracker WeakAura addon prefix for broader compatibility
+
 ### Bug Fixes
 - **Cooldown bar combat lockdown protection**: Fixed taint errors where `Show()`/`Hide()` on the cooldown bar could be blocked during combat if another addon (e.g. Atlas) spread taint through the options panel; visibility updates are now deferred until combat ends
 - **Party Buff Tracker and Totem Range Tracker buff detection**: Fixed totem buff detection for Party Range dots and SPRange by using buff spell IDs resolved via `GetSpellInfo()` instead of hardcoded name strings; fixes Wrath of Air Totem and other totems whose buff names don't match the partial totem name
-
-### New Features
-- **Windfury Tracker WeakAura support**: Non-shaman party members can now broadcast their Windfury weapon enchant status without installing ShamanPower, enabling class-colored Windfury range dots for all party members. Install the [ShamanPower Windfury Tracker Companion](https://wago.io/otSzIN5ai) WeakAura on non-shaman characters. ShamanPower also listens for the popular WFTracker WeakAura addon prefix for broader compatibility
+- **Shaman sync fix**: Fixed `SendMessage` dedup suppressing whisper responses to REQ — other shamans' SELF replies were silently dropped if their `lastMsg` already matched, preventing them from appearing in `/sp totems`
 
 ## v1.5.9 (2026-02-05)
 
