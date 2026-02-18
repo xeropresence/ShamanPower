@@ -209,7 +209,6 @@ function SP:UpdateShieldChargeDisplays()
 	end
 
 	-- Update Earth Shield
-	local hasEarthShieldTalent = IsSpellKnown(974)  -- Earth Shield spell ID
 	if settings.showEarthShield ~= false and hasEarthShieldTalent then
 		local charges = 0
 		local maxCharges = 6  -- Earth Shield has 6 charges
@@ -243,3 +242,4 @@ function SP:UpdateShieldChargeDisplays()
 		earthFrame:Hide()
 	end
 end
+
