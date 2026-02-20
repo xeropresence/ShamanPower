@@ -143,7 +143,7 @@ function SP:UpdateShieldChargeDisplays()
 	if not settings then return end
 
 	-- Enable/disable the shieldCharge subsystem based on settings
-	local hasEarthShieldTalent = IsSpellKnown(974)  -- Earth Shield spell ID
+	local hasEarthShieldTalent = C_SpellBook.IsSpellKnown(974)  -- Earth Shield spell ID
 	local showAny = (settings.showPlayerShield ~= false) or (settings.showEarthShield ~= false and hasEarthShieldTalent)
 	if showAny then
 		self:EnableUpdateSubsystem("shieldCharge")
@@ -242,4 +242,5 @@ function SP:UpdateShieldChargeDisplays()
 		earthFrame:Hide()
 	end
 end
+
 
