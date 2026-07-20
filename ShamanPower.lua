@@ -29,6 +29,32 @@ for name, path in pairs(SP_SOUNDS) do
 end
 local LUIDDM = LibStub("LibUIDropDownMenu-4.0")
 
+-- Patch 2.5.6+: IsUnderMouse(true) returns nil in the secure restricted
+-- environment (recursive form broken by the Midnight shared UI code brought
+-- to Classic). "not nil" is true, so flyouts closed unconditionally on every
+-- OnLeave. Fix: walk children explicitly using the still-working
+-- non-recursive IsUnderMouse().
+local SP_SECURE_ONLEAVE_SELF = [[
+	if self:IsUnderMouse() then return end
+	local children = newtable(self:GetChildren())
+	for i = 1, #children do
+		local c = children[i]
+		if c:IsShown() and c:IsUnderMouse() then return end
+	end
+	self:ChildUpdate("show", false)
+]]
+
+local SP_SECURE_ONLEAVE_PARENT = [[
+	local parent = self:GetParent()
+	if parent:IsUnderMouse() then return end
+	local children = newtable(parent:GetChildren())
+	for i = 1, #children do
+		local c = children[i]
+		if c:IsShown() and c:IsUnderMouse() then return end
+	end
+	parent:ChildUpdate("show", false)
+]]
+
 local LCD = (ShamanPower.isVanilla) and LibStub("LibClassicDurations", true)
 local UnitAura = LCD and LCD.UnitAuraWrapper or UnitAura
 
@@ -209,7 +235,7 @@ do
 end
 
 ShamanPower.Credits1 = "ShamanPower - Shaman Totem Coordination"
-ShamanPower.Credits2 = "Based on PallyPower by Aznamir, Dyaxler, Es, gallantron. Adapted by taubut."
+ShamanPower.Credits2 = "Created by Srumar. Originally adapted from PallyPower."
 
 function ShamanPower:Debug(s)
 	if (ShamanPower.AC_DebugEnabled) then
@@ -4959,11 +4985,7 @@ function ShamanPower:CreateTotemButtons()
 		]])
 
 		-- SECURE HANDLER: Hide flyout on leave (WORKS IN COMBAT)
-		btn:SetAttribute("_onleave", [[
-			if not self:IsUnderMouse(true) then
-				self:ChildUpdate("show", false)
-			end
-		]])
+		btn:SetAttribute("_onleave", SP_SECURE_ONLEAVE_SELF)
 
 		-- SECURE HANDLER: Show flyout on right-click when in click mode (WORKS IN COMBAT)
 		btn:SetAttribute("_onmouseup", [[
@@ -5382,11 +5404,7 @@ function ShamanPower:CreateTotemFlyout(element)
 			]])
 
 			-- SECURE HANDLER: Check parent on leave (WORKS IN COMBAT)
-			btn:SetAttribute("_onleave", [[
-				if not self:GetParent():IsUnderMouse(true) then
-					self:GetParent():ChildUpdate("show", false)
-				end
-			]])
+			btn:SetAttribute("_onleave", SP_SECURE_ONLEAVE_PARENT)
 
 			-- Store spell info as attributes for secure snippets
 			btn:SetAttribute("mySpell", spellName)
@@ -6680,11 +6698,7 @@ function ShamanPower:CreateCooldownBar()
 				]])
 
 				-- SECURE HANDLER: Hide flyout on leave (WORKS IN COMBAT)
-				btn:SetAttribute("_onleave", [[
-					if not self:IsUnderMouse(true) then
-						self:ChildUpdate("show", false)
-					end
-				]])
+				btn:SetAttribute("_onleave", SP_SECURE_ONLEAVE_SELF)
 
 				-- SECURE HANDLER: Show flyout on right-click when in click mode (WORKS IN COMBAT)
 				btn:SetAttribute("_onmouseup", [[
@@ -8544,11 +8558,7 @@ function ShamanPower:CreateWeaponImbueButton()
 	]])
 
 	-- SECURE HANDLER: Hide flyout on leave (WORKS IN COMBAT)
-	btn:SetAttribute("_onleave", [[
-		if not self:IsUnderMouse(true) then
-			self:ChildUpdate("show", false)
-		end
-	]])
+	btn:SetAttribute("_onleave", SP_SECURE_ONLEAVE_SELF)
 
 	-- SECURE HANDLER: Show flyout on right-click when in click mode (WORKS IN COMBAT)
 	btn:SetAttribute("_onmouseup", [[
@@ -8682,11 +8692,7 @@ function ShamanPower:CreateShieldFlyout()
 			]])
 
 			-- SECURE HANDLER: Check parent on leave (WORKS IN COMBAT)
-			btn:SetAttribute("_onleave", [[
-				if not self:GetParent():IsUnderMouse(true) then
-					self:GetParent():ChildUpdate("show", false)
-				end
-			]])
+			btn:SetAttribute("_onleave", SP_SECURE_ONLEAVE_PARENT)
 
 			-- Left-click casts shield; right-click has no type2 so no cast happens
 			btn:SetAttribute("type1", "spell")
@@ -8876,11 +8882,7 @@ function ShamanPower:CreateWeaponImbueFlyout()
 			]])
 
 			-- SECURE HANDLER: Check parent on leave (WORKS IN COMBAT)
-			btn:SetAttribute("_onleave", [[
-				if not self:GetParent():IsUnderMouse(true) then
-					self:GetParent():ChildUpdate("show", false)
-				end
-			]])
+			btn:SetAttribute("_onleave", SP_SECURE_ONLEAVE_PARENT)
 
 			-- Click to cast imbue spell (left=main hand, right=off hand)
 			local mainHandMacro = "/cast [@none] " .. spellName .. "\n/use 16\n/click StaticPopup1Button1"
@@ -9677,11 +9679,7 @@ function ShamanPower:CreateEarthShieldButton()
 			self:ChildUpdate("show", true)
 		end
 	]])
-	esBtn:SetAttribute("_onleave", [[
-		if not self:IsUnderMouse(true) then
-			self:ChildUpdate("show", false)
-		end
-	]])
+	esBtn:SetAttribute("_onleave", SP_SECURE_ONLEAVE_SELF)
 
 	-- Icon (use the template's icon - $parentIcon becomes ShamanPowerEarthShieldBtnIcon)
 	local icon = _G[esBtn:GetName() .. "Icon"]
@@ -10137,11 +10135,7 @@ function ShamanPower:UpdateOrCreateESFlyoutButton(index, name, class, unit, esBt
 		]])
 
 		-- SECURE HANDLER: Check parent on leave
-		btn:SetAttribute("_onleave", [[
-			if not self:GetParent():IsUnderMouse(true) then
-				self:GetParent():ChildUpdate("show", false)
-			end
-		]])
+		btn:SetAttribute("_onleave", SP_SECURE_ONLEAVE_PARENT)
 
 		btn:RegisterForClicks("AnyUp", "AnyDown")
 
@@ -16641,11 +16635,7 @@ function ShamanPower:CreateLoadoutBar()
 		self:ChildUpdate("show", true)
 	]])
 
-	anchor:SetAttribute("_onleave", [[
-		if not self:IsUnderMouse(true) then
-			self:ChildUpdate("show", false)
-		end
-	]])
+	anchor:SetAttribute("_onleave", SP_SECURE_ONLEAVE_SELF)
 
 	-- Anchor normal texture (standard WoW action button look)
 	local normalTex = anchor:CreateTexture(nil, "BORDER")
@@ -16741,11 +16731,7 @@ function ShamanPower:CreateLoadoutBar()
 
 		-- SECURE HANDLER: Hide flyout when mouse leaves set button (if not over parent anchor)
 		-- Same pattern as totem flyout _onleave
-		btn:SetAttribute("_onleave", [[
-			if not self:GetParent():IsUnderMouse(true) then
-				self:GetParent():ChildUpdate("show", false)
-			end
-		]])
+		btn:SetAttribute("_onleave", SP_SECURE_ONLEAVE_PARENT)
 
 		-- SECURE HANDLER: Toggle visibility on parent ChildUpdate("toggle")
 		-- Same as TotemTimers: _childupdate-toggle
